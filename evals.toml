@@ -7,7 +7,12 @@
 # Fixed decoding for quality tasks so models are compared on equal footing.
 temperature = 0.0
 seed = 42
-max_tokens = 512
+# Reasoning models (gpt-oss, frontier) spend hidden reasoning tokens from this budget before
+# the visible answer. 512 truncated ~15% of gpt-oss answers mid-thought in the Sept 2026 run.
+max_tokens = 4096
+# Optional: low | medium | high. Unset = model default. Passed as chat_template_kwargs to
+# llama-server (gpt-oss) and as reasoning_effort to OpenAI.
+# reasoning_effort = "low"
 
 [judge]
 # LLM judge for free-text answers. Must be served (spark-llm serve <model>) when a task needs it.
@@ -47,13 +52,18 @@ perf_lengths = [8192, 32768, 65536, 100000]
 #   ytd      -> fiscal year-to-date ending at the period end (cash-flow statement)
 [[sec.xbrl_tags]]
 tag = "Revenues"
-label = "total revenues (net sales)"
+label = "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)"
 kind = "duration"
+# Filers tag the top line inconsistently: XOM/WMT report Revenues (incl. other income) and a
+# separate contract-revenue line; utilities (NEE) use RegulatedAndUnregulatedOperatingRevenue.
+# Any same-period family value is a fair answer to "total revenues".
 aliases = [
+  "RegulatedAndUnregulatedOperatingRevenue",
   "RevenueFromContractWithCustomerExcludingAssessedTax",
   "RevenueFromContractWithCustomerIncludingAssessedTax",
   "SalesRevenueNet",
 ]
+accept_aliases = true
 
 [[sec.xbrl_tags]]
 tag = "NetIncomeLoss"
@@ -102,7 +112,10 @@ kind = "instant"
 tag = "LongTermDebtNoncurrent"
 label = "long-term debt, excluding the current portion"
 kind = "instant"
-aliases = ["LongTermDebt"]
+# LongTermDebt (total, incl. current installments) is deliberately NOT an alias: it contradicts
+# the label and produced a wrong ground truth for HD in the Sept 2026 run.
+aliases = ["LongTermDebtAndCapitalLeaseObligations"]
+accept_aliases = true
 
 [[sec.xbrl_tags]]
 tag = "CommonStockSharesOutstanding"

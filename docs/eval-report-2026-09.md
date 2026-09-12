@@ -36,7 +36,8 @@ flowchart LR
   NetCashProvidedByUsedInOperatingActivities, Assets, Liabilities, StockholdersEquity,
   CashAndCashEquivalentsAtCarryingValue, LongTermDebtNoncurrent, CommonStockSharesOutstanding.
 - **Decoding:** local models used `temperature=0`, `seed=42`, `max_tokens=512`. Terra used
-  provider defaults (frontier reasoning models reject fixed temperature/seed).
+  provider defaults (frontier reasoning models reject fixed temperature/seed). **The 512
+  budget turned out to be the main source of local misses; see [What changed](#what-changed-since-this-run).**
 - **Hardware / build:** NVIDIA GB10, llama.cpp `82d6bb284d1f`, both local models at 131,072
   tokens per slot. Terra at the published 1.05M context window.
 - **Artifacts:**
@@ -139,8 +140,7 @@ treating 96.4% as a final number.
   Spark's 121 GB unified memory.
 - Slower TTFT than the API (3.7–6.1 s p50 vs 1.2 s).
 - You own ops: process crashes, CUDA upgrades, model pins, auth in front of `0.0.0.0`.
-- `models.toml` still pins 120b at `ctx_size = 65536`; a fair 131K run needs an explicit
-  `--ctx-size 131072` override at serve time.
+- ~~`models.toml` still pins 120b at `ctx_size = 65536`~~ — now 131,072 by default.
 
 ### Hosted frontier (`gpt-5.6-terra`)
 
@@ -188,8 +188,8 @@ uv run spark-llm serve gpt-oss-20b
 uv run spark-llm eval sec run gpt-oss-20b --task extract-full --forms 10-K
 uv run spark-llm stop gpt-oss-20b
 
-# Local 120b — must override the 65K default in models.toml
-uv run spark-llm serve gpt-oss-120b --ctx-size 131072
+# Local 120b (models.toml now defaults to 131072)
+uv run spark-llm serve gpt-oss-120b
 uv run spark-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
 uv run spark-llm stop gpt-oss-120b
 
@@ -203,10 +203,70 @@ uv run spark-llm eval sec run gpt-5.6-terra \
 uv run spark-llm eval report --suite sec
 ```
 
+## What changed since this run
+
+A post-hoc audit of the three `results.jsonl` files showed the 120b-vs-Terra gap is mostly a
+harness artefact, not a model gap. The harness was fixed on 2026-09-12; the tables above are
+from the **pre-fix** runs and will be replaced after a re-run.
+
+**Context was not the limiter.** All 96 paired questions had the full filing in context
+(`doc_tokens == context_tokens`; the harness skips oversized filings rather than truncating
+them). More context would only have added GS and STWD, and gpt-oss's native window is 131K.
+
+**Output budget was.** gpt-oss reasons before answering and spends that budget from
+`max_tokens`. At 512 tokens it frequently ran out mid-thought and emitted no answer
+(`finish_reason=length`, empty content), which the old client recorded as a plain miss.
+
+| Model | Paired misses | Hit 512 tokens, empty answer | Shared by all three | Genuine model errors |
+| --- | ---: | ---: | ---: | ---: |
+| `gpt-oss-20b` | 22 | 13 | 4 | 5 |
+| `gpt-oss-120b` | 10 | 6 | 4 | 0 |
+| `gpt-5.6-terra` | 4 | 0 | 4 | 0 |
+
+Every non-shared 120b miss was a truncated reasoning trace; on every question it finished, it
+was right. Terra answered in ~7 completion tokens (p50) with almost no reasoning and never hit
+the wall.
+
+**The four shared misses were ground-truth bugs**, verified against EDGAR company facts:
+
+- WMT `Revenues`: expected the `Revenues` total (713.2B); models returned the
+  contract-revenue net-sales line (706.4B), which is also in the filing.
+- NEE `Revenues`: expected came from alias `RevenueFromContractWithCustomer…` (25.8B); NEE's
+  top line is `RegulatedAndUnregulatedOperatingRevenue` (27.4B), which all models returned.
+- HD `LongTermDebtNoncurrent`: the tag is absent for HD, so alias `LongTermDebt` (49.4B,
+  *includes* current installments) became expected. Models returned
+  `LongTermDebtAndCapitalLeaseObligations` (46.3B), the actual "excluding current portion" line.
+- XOM `Revenues`: expected `Revenues` = "Total revenues and other income" (332.2B); models
+  returned "Sales and other operating revenue" (323.9B), which XOM does not tag in us-gaap.
+  The old label "total revenues (net sales)" invited that answer.
+
+**Harness fixes (this commit):**
+
+1. `[quality].max_tokens` 512 → 4096; optional `reasoning_effort` knob (`--reasoning-effort`,
+   passed as `chat_template_kwargs` to llama-server or `reasoning_effort` to OpenAI).
+2. The client now captures streamed `reasoning_content`, counts its tokens, and flags
+   `truncated` items; `summarise` and the report carry a `truncated` column.
+3. Ground truth: alias order is now a real preference; `Revenues` gained
+   `RegulatedAndUnregulatedOperatingRevenue`; `LongTermDebt` was removed as an alias and
+   `LongTermDebtAndCapitalLeaseObligations` added; both tags accept any same-period family
+   value (`accept_aliases`), and each result records the XBRL `concept` and `matched_value`.
+   `NetIncomeLoss` / `StockholdersEquity` stay strict (their labels say "attributable").
+   The `Revenues` label now points at the income statement's total-revenues line.
+4. `eval report` adds a **Paired** table (items answered by every run of a task); it
+   reproduces the 92 / 86 / 74 of 96 numbers above.
+5. OpenAI client honours `Retry-After`, retries 8× with a 60 s cap.
+6. `models.toml` pins 120b at 131,072 context.
+
+Re-scoring the old answers against the fixed ground truth (no model re-run) turns WMT, NEE and
+HD green for all three models; XOM depends on the new label and needs a re-run. With
+truncation fixed, the expected paired ceiling is 96/96 and 120b is likely at or near Terra.
+
 ## Bottom line for the team
 
 - For **on-prem SEC extraction at 131K context**, `gpt-oss-120b` is the practical choice:
-  ~90% paired accuracy, no data egress, strong caching, zero API spend.
+  ~90% paired accuracy *under the old 512-token budget*, no data egress, strong caching, zero
+  API spend. Its remaining misses were all budget truncation or ground-truth bugs, so expect
+  parity with Terra on the paired set after the re-run.
 - For **highest accuracy and documents that exceed 131K**, `gpt-5.6-terra` wins, at roughly
   $20+ per suite run and with rate-limit / data-residency trade-offs.
 - `gpt-oss-20b` is fine for latency-sensitive or memory-tight serving, but loses ~12

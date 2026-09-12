@@ -80,6 +80,12 @@ def sec_run(
         "--context-window",
         help="OpenAI model context limit (default SPARK_LLM_OPENAI_CONTEXT_WINDOW)",
     ),
+    max_tokens: int | None = typer.Option(
+        None, "--max-tokens", help="Completion budget incl. hidden reasoning (evals.toml default)"
+    ),
+    reasoning_effort: str | None = typer.Option(
+        None, "--reasoning-effort", help="low | medium | high; '' to force the model default"
+    ),
 ) -> None:
     """Run a SEC task against the served model; results under state/evals/sec/."""
     settings = get_settings()
@@ -97,6 +103,8 @@ def sec_run(
             judge_port=judge_port,
             provider=provider,
             context_window=context_window,
+            max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
         )
         try:
             rec = run_sec_task(settings, cfg, model, opts)
@@ -106,7 +114,8 @@ def sec_run(
         s = rec.summary
         console.print(
             f"[bold]{rec.model}[/bold] {t}: score={s.get('score')} n={s.get('n')} "
-            f"skipped={s.get('skipped')} ttft_p50={s.get('ttft_p50_s')}"
+            f"skipped={s.get('skipped')} truncated={s.get('truncated')} "
+            f"ttft_p50={s.get('ttft_p50_s')}"
         )
 
 

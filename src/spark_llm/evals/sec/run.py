@@ -47,6 +47,8 @@ class SecRunOptions:
     judge_port: int | None = None
     provider: str = "local"
     context_window: int | None = None
+    max_tokens: int | None = None  # override evals.toml [quality].max_tokens
+    reasoning_effort: str | None = None  # override evals.toml [quality].reasoning_effort
 
 
 def endpoint_for(
@@ -173,6 +175,8 @@ def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
         "skipped": sum(int(bool(r.get("skipped"))) for r in results),
         "errors": sum(1 for r in results if r.get("error")),
         "off_by_scale": sum(int(bool(r.get("off_by_scale"))) for r in results),
+        # Hit max_tokens before answering: a budget problem, not a model-knowledge problem.
+        "truncated": sum(int(bool(r.get("truncated"))) for r in results),
         "ttft_p50_s": percentile(ttft, 0.5),
         "ttft_p95_s": percentile(ttft, 0.95),
         "total_p50_s": percentile(total, 0.5),
@@ -186,6 +190,16 @@ def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _reasoning_extra(ep: Endpoint, effort: str | None) -> dict[str, Any] | None:
+    """Provider-specific request field for reasoning effort (None = leave the default)."""
+    if not effort:
+        return None
+    if isinstance(ep, OpenAIEndpoint):
+        return {"reasoning_effort": effort}
+    # llama-server with --jinja forwards these to the chat template (gpt-oss reads it).
+    return {"chat_template_kwargs": {"reasoning_effort": effort}}
+
+
 def _ask(ep: Endpoint, cfg: EvalConfig, system: str, user: str) -> ChatResult:
     q = cfg.quality
     return ep.chat(
@@ -195,7 +209,20 @@ def _ask(ep: Endpoint, cfg: EvalConfig, system: str, user: str) -> ChatResult:
         max_tokens=q.max_tokens,
         stream=True,
         cache_prompt=True,
+        extra=_reasoning_extra(ep, q.reasoning_effort),
     )
+
+
+def apply_quality_overrides(cfg: EvalConfig, opts: SecRunOptions) -> EvalConfig:
+    """CLI overrides for [quality]; they flow into the context budget and config_hash."""
+    updates: dict[str, Any] = {}
+    if opts.max_tokens is not None:
+        updates["max_tokens"] = opts.max_tokens
+    if opts.reasoning_effort is not None:
+        updates["reasoning_effort"] = opts.reasoning_effort or None
+    if not updates:
+        return cfg
+    return cfg.model_copy(update={"quality": cfg.quality.model_copy(update=updates)})
 
 
 def _budget(n_ctx: int | None, cfg: EvalConfig, question_tokens: int) -> int | None:
@@ -292,6 +319,8 @@ def run_extract(
             "kind": q.kind,
             "unit": q.unit,
             "expected": q.expected,
+            "concept": q.source.get("concept"),  # XBRL concept the ground truth came from
+            "alternates": q.alternates,
             "question": q.text,
             "warm": warm,
             "mode": "chunked" if chunked else "full",
@@ -324,19 +353,25 @@ def run_extract(
             }
             writer.write(rec)
             return rec
-        s = score_numeric(r.content, q.expected, cfg.sec.tolerance)
+        s = score_numeric(r.content, q.expected, cfg.sec.tolerance, q.alternates)
         rec = {
             **base,
             "answer": r.content.strip()[:300],
             "parsed": s.parsed,
             "correct": s.correct,
+            "matched_value": s.matched,
             "off_by_scale": s.off_by_scale,
             "rel_error": s.rel_error,
             "skipped": False,
             **_timing(r),
         }
         writer.write(rec)
-        mark = "ok" if s.correct else ("scale" if s.off_by_scale else "miss")
+        if s.correct:
+            mark = "ok"
+        elif r.truncated:
+            mark = "trunc"
+        else:
+            mark = "scale" if s.off_by_scale else "miss"
         console.print(f"[dim]{mark:5s}[/dim] {q.id}: {rec['answer'][:40]!r} vs {q.expected:,.2f}")
         return rec
 
@@ -490,6 +525,7 @@ def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOp
         raise ValueError(f"unknown task {opts.task!r}; choose from {', '.join(TASKS)}")
     if opts.provider not in {"local", "openai"}:
         raise ValueError("provider must be 'local' or 'openai'")
+    cfg = apply_quality_overrides(cfg, opts)
     registry = load_registry(settings=settings)
     if opts.provider == "openai":
         ep = openai_endpoint_for(settings, model, opts.context_window)

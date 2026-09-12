@@ -119,7 +119,7 @@ extra_args = ["--embeddings"]
 repo = "ggml-org/gpt-oss-120b-GGUF"
 file = "gpt-oss-120b-MXFP4.gguf"
 kind = "chat"
-ctx_size = 65536
+ctx_size = 131072
 n_gpu_layers = 70
 port = 8082
 extra_args = ["--jinja"]
@@ -230,10 +230,18 @@ They record score, skips, TTFT, end-to-end latency, input/output token usage, ca
 tokens, and reasoning tokens when the API returns them. External latency includes network
 and provider queueing; local llama.cpp prompt throughput and remote API throughput are not
 hardware-equivalent measurements. Context budgeting uses each model's own tokenizer, so
-token counts—and therefore the set of oversized filings skipped—can differ; compare scores
-alongside `n` and `skipped`. Frontier reasoning models do not consistently support
-fixed temperature or seed, so the OpenAI path records and uses provider decoding defaults.
-Use `--limit 1` before a full run to validate model access, context size, and likely cost.
+token counts—and therefore the set of oversized filings skipped—can differ. The report's
+**Paired** table rescores every run of a task on the items all of them answered, so use it
+rather than the raw `score` column when skip sets differ. Frontier reasoning models do not
+consistently support fixed temperature or seed, so the OpenAI path records and uses provider
+decoding defaults. Use `--limit 1` before a full run to validate model access, context size,
+and likely cost.
+
+Reasoning models (gpt-oss, frontier) spend hidden reasoning tokens from `max_tokens` before
+the visible answer. The `truncated` column counts items that hit the budget with no answer;
+if it is non-zero, raise `[quality].max_tokens` in `evals.toml` (or `--max-tokens`) or lower
+`--reasoning-effort low`. Local runs record the streamed `reasoning_content` length and
+token count per item so the split between thinking and answering is visible.
 
 Filing work needs context: a 10-K is roughly 50k–150k tokens. Raise `ctx_size` in
 `models.toml` (and consider `cache_type_k`/`cache_type_v = "q8_0"`, `n_parallel`) for the

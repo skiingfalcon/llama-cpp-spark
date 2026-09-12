@@ -20,6 +20,7 @@ import httpx
 @dataclass
 class ChatResult:
     content: str = ""
+    reasoning: str = ""  # hidden chain-of-thought (``reasoning_content``), when the server emits it
     finish_reason: str | None = None
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     ttft_s: float | None = None
@@ -31,11 +32,17 @@ class ChatResult:
     timings: dict[str, Any] = field(default_factory=dict)
     status: int = 200
     error: str | None = None
+    retry_after_s: float | None = None  # from a 429/503 ``Retry-After`` header
     derive_decode_tps: bool = True
 
     @property
     def ok(self) -> bool:
         return self.error is None and self.status == 200
+
+    @property
+    def truncated(self) -> bool:
+        """Hit ``max_tokens`` before finishing; the answer is missing or cut short."""
+        return self.finish_reason == "length"
 
     @property
     def prompt_tps(self) -> float | None:
@@ -59,6 +66,8 @@ class ChatResult:
     def as_dict(self) -> dict[str, Any]:
         return {
             "finish_reason": self.finish_reason,
+            "truncated": self.truncated,
+            "reasoning_chars": len(self.reasoning),
             "ttft_s": self.ttft_s,
             "total_s": self.total_s,
             "prompt_tokens": self.prompt_tokens,
@@ -172,11 +181,20 @@ class Endpoint:
         for attempt in range(self.retries + 1):
             result = self._stream(body) if stream else self._once(body)
             if result.status == 503 and attempt < self.retries:
-                time.sleep(delay)
+                time.sleep(result.retry_after_s or delay)
                 delay = min(delay * 2, 30.0)
                 continue
+            self._fill_reasoning_tokens(result)
             return result
         return result
+
+    def _fill_reasoning_tokens(self, result: ChatResult) -> None:
+        """llama-server reports no reasoning token count; measure the text it streamed."""
+        if result.ok and result.reasoning and result.reasoning_tokens is None:
+            try:
+                result.reasoning_tokens = self.count_tokens(result.reasoning)
+            except httpx.HTTPError:
+                pass
 
     def _once(self, body: dict[str, Any]) -> ChatResult:
         t0 = time.perf_counter()
@@ -186,13 +204,19 @@ class Endpoint:
             return ChatResult(status=0, error=str(exc), total_s=time.perf_counter() - t0)
         total = time.perf_counter() - t0
         if r.status_code != 200:
-            return ChatResult(status=r.status_code, error=r.text[:500], total_s=total)
+            return ChatResult(
+                status=r.status_code,
+                error=r.text[:500],
+                total_s=total,
+                retry_after_s=_retry_after(r.headers),
+            )
         data = r.json()
         choice = (data.get("choices") or [{}])[0]
         msg = choice.get("message") or {}
         usage = data.get("usage") or {}
         result = ChatResult(
             content=msg.get("content") or "",
+            reasoning=msg.get("reasoning_content") or "",
             finish_reason=choice.get("finish_reason"),
             tool_calls=list(msg.get("tool_calls") or []),
             ttft_s=None,
@@ -206,6 +230,7 @@ class Endpoint:
         t0 = time.perf_counter()
         res = ChatResult()
         parts: list[str] = []
+        reasoning_parts: list[str] = []
         tool_calls: dict[int, dict[str, Any]] = {}
         try:
             with self._client.stream("POST", self.chat_url, json=body) as r:
@@ -215,6 +240,7 @@ class Endpoint:
                         status=r.status_code,
                         error=r.text[:500],
                         total_s=time.perf_counter() - t0,
+                        retry_after_s=_retry_after(r.headers),
                     )
                 for line in r.iter_lines():
                     if not line or not line.startswith("data:"):
@@ -232,6 +258,11 @@ class Endpoint:
                         _apply_usage(res, chunk["usage"])
                     for choice in chunk.get("choices") or []:
                         delta = choice.get("delta") or {}
+                        thought = delta.get("reasoning_content")
+                        if thought:
+                            if res.ttft_s is None:
+                                res.ttft_s = time.perf_counter() - t0
+                            reasoning_parts.append(thought)
                         text = delta.get("content")
                         if text:
                             if res.ttft_s is None:
@@ -256,6 +287,7 @@ class Endpoint:
             res.error = str(exc)
         res.total_s = time.perf_counter() - t0
         res.content = "".join(parts)
+        res.reasoning = "".join(reasoning_parts)
         res.tool_calls = [tool_calls[i] for i in sorted(tool_calls)]
         if res.timings.get("prompt_n") and res.prompt_tokens is None:
             res.prompt_tokens = int(res.timings["prompt_n"])
@@ -278,9 +310,10 @@ class OpenAIEndpoint(Endpoint):
         base_url: str = "https://api.openai.com/v1",
         context_window: int = 128000,
         timeout_s: float = 1800.0,
-        retries: int = 5,
+        retries: int = 8,
         transport: httpx.BaseTransport | None = None,
         retry_delay_s: float = 1.0,
+        max_retry_delay_s: float = 60.0,
     ) -> None:
         if not api_key:
             raise ValueError("OPENAI_API_KEY is required for --provider openai")
@@ -289,6 +322,7 @@ class OpenAIEndpoint(Endpoint):
         self.timeout = httpx.Timeout(timeout_s, connect=10.0)
         self.retries = retries
         self.retry_delay_s = retry_delay_s
+        self.max_retry_delay_s = max_retry_delay_s
         self._context_window = context_window
         self._client = httpx.Client(
             timeout=self.timeout,
@@ -356,8 +390,10 @@ class OpenAIEndpoint(Endpoint):
             result = self._stream(body) if stream else self._once(body)
             result.derive_decode_tps = False
             if result.status in retryable and attempt < self.retries:
-                time.sleep(delay)
-                delay = min(delay * 2, 30.0)
+                # Providers say how long to back off on 429; honour it, else exponential.
+                wait = result.retry_after_s if result.retry_after_s is not None else delay
+                time.sleep(min(wait, self.max_retry_delay_s))
+                delay = min(delay * 2, self.max_retry_delay_s)
                 continue
             return result
         return result
@@ -365,6 +401,17 @@ class OpenAIEndpoint(Endpoint):
 
 def _empty_tool_call() -> dict[str, Any]:
     return {"id": None, "type": "function", "function": {"name": "", "arguments": ""}}
+
+
+def _retry_after(headers: httpx.Headers) -> float | None:
+    """Seconds from a ``Retry-After`` header (delta-seconds form only)."""
+    raw = headers.get("retry-after")
+    if raw is None:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return None
 
 
 def _apply_usage(result: ChatResult, usage: dict[str, Any]) -> None:

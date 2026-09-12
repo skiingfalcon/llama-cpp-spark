@@ -47,6 +47,62 @@ def test_stream_parses_content_usage_timings_and_ttft() -> None:
     assert r.prompt_tps == 4200.0 and r.decode_tps == 55.0
 
 
+def test_stream_collects_reasoning_and_flags_truncation() -> None:
+    chunks = [
+        {"choices": [{"delta": {"reasoning_content": "Let me find"}, "index": 0}]},
+        {"choices": [{"delta": {"reasoning_content": " the table"}, "index": 0}]},
+        {"choices": [{"delta": {"content": "42"}, "index": 0, "finish_reason": "length"}]},
+        {"choices": [], "usage": {"prompt_tokens": 10, "completion_tokens": 8}},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/tokenize":
+            n = len(json.loads(request.content)["content"].split())
+            return httpx.Response(200, json={"tokens": list(range(n))})
+        return httpx.Response(200, content=_sse(chunks))
+
+    ep = Endpoint("h", 1, transport=httpx.MockTransport(handler))
+    r = ep.chat([{"role": "user", "content": "q"}], max_tokens=8)
+    assert r.content == "42" and r.reasoning == "Let me find the table"
+    assert r.ttft_s is not None  # first token counted from the first reasoning delta
+    assert r.truncated and r.finish_reason == "length"
+    assert r.reasoning_tokens == 5  # measured via /tokenize since llama-server gives no count
+    d = r.as_dict()
+    assert d["truncated"] is True and d["reasoning_chars"] == len("Let me find the table")
+
+
+def test_stream_without_reasoning_leaves_reasoning_tokens_unset() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path != "/tokenize", "no reasoning text, no tokenize call"
+        return httpx.Response(
+            200,
+            content=_sse([{"choices": [{"delta": {"content": "1"}, "finish_reason": "stop"}]}]),
+        )
+
+    r = Endpoint("h", 1, transport=httpx.MockTransport(handler)).chat(
+        [{"role": "user", "content": "q"}]
+    )
+    assert r.content == "1" and r.reasoning == "" and r.reasoning_tokens is None
+    assert not r.truncated and r.as_dict()["reasoning_chars"] == 0
+
+
+def test_local_chat_forwards_reasoning_effort_via_chat_template_kwargs() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert body["chat_template_kwargs"] == {"reasoning_effort": "low"}
+        return httpx.Response(
+            200,
+            content=_sse([{"choices": [{"delta": {"content": "1"}, "finish_reason": "stop"}]}]),
+        )
+
+    ep = Endpoint("h", 1, transport=httpx.MockTransport(handler))
+    r = ep.chat(
+        [{"role": "user", "content": "q"}],
+        extra={"chat_template_kwargs": {"reasoning_effort": "low"}},
+    )
+    assert r.ok
+
+
 def test_stream_assembles_tool_calls() -> None:
     chunks = [
         {
@@ -205,6 +261,58 @@ def test_openai_endpoint_uses_portable_request_and_tracks_usage() -> None:
     assert r.prompt_tokens == 100 and r.completion_tokens == 7
     assert r.cached_prompt_tokens == 80 and r.reasoning_tokens == 5
     assert r.decode_tps is None
+
+
+def test_openai_endpoint_passes_reasoning_effort_and_honours_retry_after() -> None:
+    calls: list[dict] = []
+    slept: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/v1/models/"):
+            return httpx.Response(200, json={"data": []})
+        body = json.loads(request.content)
+        calls.append(body)
+        if len(calls) == 1:
+            return httpx.Response(429, text="slow down", headers={"Retry-After": "0"})
+        return httpx.Response(
+            200,
+            content=_sse([{"choices": [{"delta": {"content": "7"}, "finish_reason": "stop"}]}]),
+        )
+
+    ep = OpenAIEndpoint(
+        "k", "frontier-test", transport=httpx.MockTransport(handler), retry_delay_s=0.0
+    )
+    r = ep.chat(
+        [{"role": "user", "content": "q"}], max_tokens=16, extra={"reasoning_effort": "low"}
+    )
+    assert r.ok and r.content == "7"
+    assert len(calls) == 2 and calls[0]["reasoning_effort"] == "low"
+    assert calls[1]["reasoning_effort"] == "low" and "chat_template_kwargs" not in calls[1]
+    assert ep.retries == 8 and ep.max_retry_delay_s == 60.0
+    del slept
+
+
+def test_openai_endpoint_omits_reasoning_effort_when_not_requested() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/v1/models/"):
+            return httpx.Response(200, json={"data": []})
+        assert "reasoning_effort" not in json.loads(request.content)
+        return httpx.Response(
+            200,
+            content=_sse([{"choices": [{"delta": {"content": "7"}, "finish_reason": "stop"}]}]),
+        )
+
+    ep = OpenAIEndpoint("k", "frontier-test", transport=httpx.MockTransport(handler))
+    assert ep.chat([{"role": "user", "content": "q"}], max_tokens=16).ok
+
+
+def test_retry_after_error_result_carries_header() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="nope", headers={"Retry-After": "2.5"})
+
+    ep = Endpoint("h", 1, transport=httpx.MockTransport(handler), retries=0)
+    r = ep.chat([{"role": "user", "content": "q"}])
+    assert r.status == 429 and r.retry_after_s == 2.5
 
 
 def test_helpers() -> None:

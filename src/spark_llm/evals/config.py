@@ -15,7 +15,12 @@ class QualitySettings(BaseModel):
 
     temperature: float = 0.0
     seed: int = 42
-    max_tokens: int = 512
+    # Completion budget. Reasoning models (gpt-oss, frontier) spend hidden reasoning tokens
+    # from this budget before the visible answer; 512 truncates them mid-thought.
+    max_tokens: int = 4096
+    # low | medium | high; None = model/provider default. Local: chat_template_kwargs,
+    # OpenAI: reasoning_effort.
+    reasoning_effort: str | None = None
 
 
 class JudgeSettings(BaseModel):
@@ -31,9 +36,13 @@ class Company(BaseModel):
 class XbrlTag(BaseModel):
     tag: str
     label: str
-    kind: str = "duration"  # duration | instant
+    kind: str = "duration"  # duration | instant | ytd
     unit: str = "USD"
-    aliases: list[str] = Field(default_factory=list)
+    aliases: list[str] = Field(default_factory=list)  # declared order = preference order
+    # When several concepts in the family legitimately answer the label (e.g. "total revenues"
+    # vs "net sales"), accept a match against any same-period family value, not only the
+    # selected one.
+    accept_aliases: bool = False
 
 
 class FinanceBenchSettings(BaseModel):

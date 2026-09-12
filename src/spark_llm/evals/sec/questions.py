@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -23,6 +24,9 @@ class Question:
     text: str
     format_hint: str
     source: dict[str, Any] = field(default_factory=dict)
+    # Other same-period values from the tag family that also answer the label (only populated
+    # when the tag sets ``accept_aliases``). ``expected`` stays the preferred concept's value.
+    alternates: list[float] = field(default_factory=list)
 
 
 def _days(start: str, end: str) -> int:
@@ -65,29 +69,54 @@ def select_fact(
     """Pick the single fact a reader of this filing should find for ``tag``.
 
     Preference: reported in this very filing (accn) > same form, same period end.
-    Within ties: entries carrying a calendar ``frame`` (deduplicated by EDGAR) > latest filed.
-    For ``ytd`` on a 10-Q the longest qualifying duration wins.
+    Within ties: canonical concept, then aliases in declared order; for ``ytd`` on a 10-Q the
+    longest qualifying duration; entries carrying a calendar ``frame`` (deduplicated by EDGAR);
+    latest filed.
     """
-    cands = [
-        e
-        for e in _entries(facts, tag)
-        if e.get("end") == report_date and _duration_ok(tag.kind, form, e)
-    ]
+    cands = period_candidates(facts, tag, form, report_date)
     if not cands:
         return None
     own = [e for e in cands if e.get("accn") == accession]
     pool = own or [e for e in cands if e.get("form") == form] or cands
+    order = [tag.tag, *tag.aliases]
 
     def rank(e: dict[str, Any]) -> tuple:
         dur = _days(e["start"], e["end"]) if "start" in e else 0
         return (
-            e["concept"] == tag.tag,  # canonical concept over aliases
+            -order.index(e["concept"]),  # canonical concept, then aliases as declared
             dur if tag.kind == "ytd" else 0,
             "frame" in e,
             e.get("filed", ""),
         )
 
     return max(pool, key=rank)
+
+
+def period_candidates(
+    facts: dict[str, Any], tag: XbrlTag, form: str, report_date: str
+) -> list[dict[str, Any]]:
+    """All family facts ending on ``report_date`` with a duration valid for ``tag.kind``."""
+    return [
+        e
+        for e in _entries(facts, tag)
+        if e.get("end") == report_date and _duration_ok(tag.kind, form, e)
+    ]
+
+
+def alternate_values(
+    facts: dict[str, Any], tag: XbrlTag, form: str, report_date: str, chosen: dict[str, Any]
+) -> list[float]:
+    """Distinct same-period family values other than the chosen fact's (``accept_aliases``)."""
+    if not tag.accept_aliases:
+        return []
+    out: list[float] = []
+    for e in period_candidates(facts, tag, form, report_date):
+        if e["concept"] == chosen["concept"]:
+            continue
+        v = float(e["val"])
+        if v != float(chosen["val"]) and v not in out:
+            out.append(v)
+    return out
 
 
 def _fmt_date(d: str) -> str:
@@ -143,6 +172,7 @@ def questions_for_filing(
                 text=f"What was {tag.label} {phrase}?",
                 format_hint=_hint(tag.unit),
                 source={k: e.get(k) for k in ("concept", "accn", "form", "fy", "fp", "frame")},
+                alternates=alternate_values(facts, tag, form, report_date, e),
             )
         )
     return out
@@ -200,9 +230,17 @@ class Score:
     parsed: float | None
     off_by_scale: bool = False
     rel_error: float | None = None
+    matched: float | None = None  # which accepted value the answer matched (expected or alternate)
 
 
-def score_numeric(answer: str, expected: float, tolerance: float) -> Score:
+def score_numeric(
+    answer: str, expected: float, tolerance: float, alternates: Sequence[float] = ()
+) -> Score:
+    """Score a free-text answer against ``expected`` (or any of ``alternates``).
+
+    ``rel_error`` and ``off_by_scale`` are always relative to ``expected`` so reports stay
+    comparable; ``matched`` records which accepted value the answer actually hit.
+    """
     parsed = parse_number(answer)
     if parsed is None:
         return Score(correct=False, parsed=None)
@@ -212,11 +250,11 @@ def score_numeric(answer: str, expected: float, tolerance: float) -> Score:
             return abs(a) <= 0.5
         return abs(a - b) <= tolerance * abs(b)
 
-    if close(parsed, expected):
-        rel = abs(parsed - expected) / abs(expected) if expected else 0.0
-        return Score(correct=True, parsed=parsed, rel_error=rel)
-    scaled = any(close(parsed * f, expected) for f in (1e3, 1e6, 1e9, 1e-3, 1e-6, 1e-9))
     rel = abs(parsed - expected) / abs(expected) if expected else None
+    for target in (expected, *alternates):
+        if close(parsed, target):
+            return Score(correct=True, parsed=parsed, rel_error=rel, matched=target)
+    scaled = any(close(parsed * f, expected) for f in (1e3, 1e6, 1e9, 1e-3, 1e-6, 1e-9))
     return Score(correct=False, parsed=parsed, off_by_scale=scaled, rel_error=rel)
 
 

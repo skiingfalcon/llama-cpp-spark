@@ -66,11 +66,65 @@ def test_10k_questions_pick_fiscal_year_values(facts, tags) -> None:
             key="AAPL:10-K:2025-09-27",
         )
     )
-    assert qs["Revenues"].expected == 416_161_000_000
+    # The fixture's FY 10-K tags both a total-revenues line (canonical) and the contract-revenue
+    # line; the canonical concept sets ``expected`` and the other becomes an accepted alternate.
+    assert qs["Revenues"].expected == 420_000_000_000
+    assert qs["Revenues"].source["concept"] == "Revenues"
+    assert qs["Revenues"].alternates == [416_161_000_000]
     assert "fiscal year ended September 27, 2025" in qs["Revenues"].text
     assert qs["NetIncomeLoss"].expected == 112_010_000_000
+    assert qs["NetIncomeLoss"].alternates == []  # strict tag: no accept_aliases
     assert qs["StockholdersEquity"].expected == 73_733_000_000
     assert len(qs) == 11
+
+
+def test_long_term_debt_prefers_noncurrent_and_ignores_total_debt(facts, tags) -> None:
+    qs = _by_tag(
+        questions_for_filing(
+            facts,
+            tags,
+            form="10-K",
+            accession="0000320193-25-000079",
+            report_date="2025-09-27",
+            key="AAPL:10-K:2025-09-27",
+        )
+    )
+    q = qs["LongTermDebtNoncurrent"]
+    assert q.source["concept"] == "LongTermDebtNoncurrent" and q.expected == 78_328_000_000
+    # Lease-inclusive noncurrent line is an acceptable alternate; LongTermDebt (total incl.
+    # current portion) is not part of the family and must never be accepted.
+    assert q.alternates == [79_000_000_000]
+    assert 90_000_000_000 not in q.alternates
+
+
+def test_alias_declared_order_breaks_ties(facts) -> None:
+    from spark_llm.evals.config import XbrlTag
+
+    tag = XbrlTag(
+        tag="Missing",
+        label="x",
+        kind="instant",
+        aliases=["LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
+    )
+    q = questions_for_filing(
+        facts,
+        [tag],
+        form="10-K",
+        accession="0000320193-25-000079",
+        report_date="2025-09-27",
+        key="k",
+    )[0]
+    assert q.source["concept"] == "LongTermDebt"  # first declared alias wins
+    tag.aliases.reverse()
+    q = questions_for_filing(
+        facts,
+        [tag],
+        form="10-K",
+        accession="0000320193-25-000079",
+        report_date="2025-09-27",
+        key="k",
+    )[0]
+    assert q.source["concept"] == "LongTermDebtAndCapitalLeaseObligations"
 
 
 def test_missing_period_yields_no_question(facts, tags) -> None:
@@ -110,6 +164,16 @@ def test_score_numeric_tolerance_and_scale() -> None:
     assert not score_numeric("unknown", 1.0, 0.005).correct
     assert score_numeric("-1,234", -1234, 0.005).correct
     assert score_numeric("0", 0, 0.005).correct
+
+
+def test_score_numeric_accepts_alternates_but_reports_error_vs_expected() -> None:
+    s = score_numeric("706,413,000,000", 713_163_000_000, 0.005, alternates=[706_413_000_000])
+    assert s.correct and s.matched == 706_413_000_000
+    assert s.rel_error is not None and s.rel_error > 0.005  # still measured against expected
+    s = score_numeric("713,163,000,000", 713_163_000_000, 0.005, alternates=[706_413_000_000])
+    assert s.correct and s.matched == 713_163_000_000
+    s = score_numeric("700,000,000,000", 713_163_000_000, 0.005, alternates=[706_413_000_000])
+    assert not s.correct and s.matched is None
 
 
 def test_answer_has_single_number() -> None:
