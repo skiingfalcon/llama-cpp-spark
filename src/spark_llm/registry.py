@@ -32,6 +32,10 @@ class Defaults(BaseModel):
     batch_size: int = 2048
     ubatch_size: int = 2048
     host: str = "0.0.0.0"
+    # llama-server splits --ctx-size across -np slots; keep in mind when raising n_parallel.
+    n_parallel: int | None = None
+    cache_type_k: str | None = None
+    cache_type_v: str | None = None
 
 
 class ModelSpec(BaseModel):
@@ -52,6 +56,9 @@ class ModelSpec(BaseModel):
     batch_size: int | None = None
     ubatch_size: int | None = None
     host: str | None = None
+    n_parallel: int | None = None
+    cache_type_k: str | None = None
+    cache_type_v: str | None = None
 
     def local_path(self, models_dir: Path) -> Path | None:
         if self.file:
@@ -65,6 +72,12 @@ class ModelSpec(BaseModel):
         if self.quant:
             return f"{self.repo}:{self.quant}"
         return self.repo
+
+    def snapshot_dir(self, models_dir: Path) -> Path | None:
+        """Where ``download_model`` places a repo/quant snapshot (no explicit file)."""
+        if not self.repo:
+            return None
+        return models_dir / self.repo.replace("/", "__")
 
 
 class Registry(BaseModel):

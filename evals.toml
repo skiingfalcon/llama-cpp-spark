@@ -1,0 +1,153 @@
+# Evaluation suites for spark-llm. Data, not code: edit here, not in Python.
+#
+# Every eval talks to a *running* llama-server started by `spark-llm serve`, so results
+# reflect the served configuration (ctx, slots, sampling, chat template).
+
+[quality]
+# Fixed decoding for quality tasks so models are compared on equal footing.
+temperature = 0.0
+seed = 42
+max_tokens = 512
+
+[judge]
+# LLM judge for free-text answers. Must be served (spark-llm serve <model>) when a task needs it.
+model = "gpt-oss-120b"
+max_tokens = 256
+
+# --------------------------------------------------------------------------------------------
+# SEC 10-K / 10-Q suite
+# --------------------------------------------------------------------------------------------
+[sec]
+# Latest 1x 10-K and 3x 10-Q per company (EDGAR). CIKs verified against
+# data.sec.gov/submissions on 2026-09-12.
+companies = [
+  { ticker = "AAPL", cik = 320193 },
+  { ticker = "MSFT", cik = 789019 },
+  { ticker = "JPM",  cik = 19617 },
+  { ticker = "XOM",  cik = 34088 },
+  { ticker = "JNJ",  cik = 200406 },
+  { ticker = "WMT",  cik = 104169 },
+  { ticker = "PG",   cik = 80424 },
+  { ticker = "CAT",  cik = 18230 },
+  { ticker = "NEE",  cik = 753308 },
+  { ticker = "HD",   cik = 354950 },
+  { ticker = "PLD",  cik = 1045609 },
+  { ticker = "STWD", cik = 1465128 },
+]
+forms = { "10-K" = 1, "10-Q" = 3 }
+chunk_tokens = 8000          # extract-chunked: chunk size in model tokens
+top_k = 6                    # extract-chunked: BM25 chunks placed in context
+tolerance = 0.005            # numeric match: relative tolerance (0.5 %)
+max_input_tokens = 0         # 0 = whatever the served ctx allows
+perf_lengths = [8192, 32768, 65536, 100000]
+
+# Ground truth: XBRL company facts (data.sec.gov/api/xbrl/companyfacts). kind:
+#   instant  -> balance-sheet value at the period end
+#   duration -> 12 months (10-K) or the 3 months (10-Q) ending at the period end
+#   ytd      -> fiscal year-to-date ending at the period end (cash-flow statement)
+[[sec.xbrl_tags]]
+tag = "Revenues"
+label = "total revenues (net sales)"
+kind = "duration"
+aliases = [
+  "RevenueFromContractWithCustomerExcludingAssessedTax",
+  "RevenueFromContractWithCustomerIncludingAssessedTax",
+  "SalesRevenueNet",
+]
+
+[[sec.xbrl_tags]]
+tag = "NetIncomeLoss"
+label = "net income (loss) attributable to the company"
+kind = "duration"
+aliases = ["ProfitLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"]
+
+[[sec.xbrl_tags]]
+tag = "OperatingIncomeLoss"
+label = "operating income (loss)"
+kind = "duration"
+
+[[sec.xbrl_tags]]
+tag = "EarningsPerShareDiluted"
+label = "diluted earnings per share"
+kind = "duration"
+unit = "USD/shares"
+
+[[sec.xbrl_tags]]
+tag = "NetCashProvidedByUsedInOperatingActivities"
+label = "net cash provided by operating activities"
+kind = "ytd"
+
+[[sec.xbrl_tags]]
+tag = "Assets"
+label = "total assets"
+kind = "instant"
+
+[[sec.xbrl_tags]]
+tag = "Liabilities"
+label = "total liabilities"
+kind = "instant"
+
+[[sec.xbrl_tags]]
+tag = "StockholdersEquity"
+label = "total stockholders' equity attributable to the company"
+kind = "instant"
+aliases = ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]
+
+[[sec.xbrl_tags]]
+tag = "CashAndCashEquivalentsAtCarryingValue"
+label = "cash and cash equivalents"
+kind = "instant"
+
+[[sec.xbrl_tags]]
+tag = "LongTermDebtNoncurrent"
+label = "long-term debt, excluding the current portion"
+kind = "instant"
+aliases = ["LongTermDebt"]
+
+[[sec.xbrl_tags]]
+tag = "CommonStockSharesOutstanding"
+label = "common shares outstanding"
+kind = "instant"
+unit = "shares"
+aliases = ["EntityCommonStockSharesOutstanding"]
+
+[sec.financebench]
+# Human-written QA over 10-K/10-Q filings (open subset, 150 questions).
+# Licence is CC-BY-NC-4.0 at last check: fine for internal model selection, review before
+# any commercial redistribution of derived numbers. Set enabled = false to skip.
+enabled = true
+repo = "PatronusAI/financebench"
+file = "financebench_open_source.jsonl"
+license = "CC-BY-NC-4.0"
+
+# --------------------------------------------------------------------------------------------
+# SWE suite (three tiers; all drive the served OpenAI-compatible endpoint)
+# --------------------------------------------------------------------------------------------
+[swe.tier1]
+# Function-level coding sanity check; minutes per model.
+tool = "evalplus"
+version = "0.3.1"
+datasets = ["humaneval", "mbpp"]
+
+[swe.tier2]
+# Aider polyglot benchmark: 225 exercises, 6 languages; measures edit-format compliance.
+# Needs Docker. ref is resolved to a commit and recorded in run.json.
+tool = "aider"
+repo = "https://github.com/Aider-AI/aider"
+ref = "main"
+exercises_repo = "https://github.com/Aider-AI/polyglot-benchmark"
+exercises_ref = "main"
+edit_format = "diff"
+workers = 4
+
+[swe.tier3]
+# SWE-bench Verified subset: 50 instances sampled with random.seed(0) from the 500 ids on
+# 2026-09-12 (sorted). Patches via mini-swe-agent, scoring via the swebench harness.
+# Run the harness on an x86_64 box with Docker; arm64 image coverage on the Spark is unverified.
+tool = "mini-swe-agent"
+dataset = "princeton-nlp/SWE-bench_Verified"
+limit = 50
+seed = 0
+workers = 4
+step_limit = 75
+instances = ["astropy__astropy-8707", "django__django-11163", "django__django-11433", "django__django-11477", "django__django-11490", "django__django-12125", "django__django-12209", "django__django-13401", "django__django-13807", "django__django-13821", "django__django-14140", "django__django-14434", "django__django-14534", "django__django-14787", "django__django-15161", "django__django-15268", "django__django-15561", "django__django-15851", "django__django-16082", "django__django-16256", "django__django-16801", "django__django-16899", "django__django-17029", "matplotlib__matplotlib-20859", "matplotlib__matplotlib-22865", "matplotlib__matplotlib-24637", "matplotlib__matplotlib-26466", "pydata__xarray-2905", "pydata__xarray-4687", "pydata__xarray-6992", "scikit-learn__scikit-learn-10844", "scikit-learn__scikit-learn-13439", "scikit-learn__scikit-learn-25102", "sphinx-doc__sphinx-10673", "sphinx-doc__sphinx-11510", "sphinx-doc__sphinx-8265", "sphinx-doc__sphinx-8621", "sphinx-doc__sphinx-9258", "sphinx-doc__sphinx-9711", "sympy__sympy-13372", "sympy__sympy-13615", "sympy__sympy-16597", "sympy__sympy-16766", "sympy__sympy-17318", "sympy__sympy-17630", "sympy__sympy-18199", "sympy__sympy-18211", "sympy__sympy-19495", "sympy__sympy-24066", "sympy__sympy-24213"]

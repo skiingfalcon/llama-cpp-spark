@@ -17,6 +17,10 @@ vendor/
 models/
 *.gguf
 
+# Eval corpora and cloned external harnesses (regenerate with spark-llm eval …)
+evals/data/
+evals/tools/
+
 # Runtime state (PIDs, llama-server logs)
 state/
 .state/

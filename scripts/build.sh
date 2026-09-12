@@ -78,6 +78,7 @@ configure_and_build() {
 LOG="$(mktemp)"
 trap 'rm -f "${LOG}"' EXIT
 
+BUILT_ARCH="121a-real"
 set +e
 configure_and_build "121a-real" 2>&1 | tee "${LOG}"
 STATUS=${PIPESTATUS[0]}
@@ -87,11 +88,17 @@ if [[ ${STATUS} -ne 0 ]]; then
   if grep -qiE 'block_scale|not supported on .target .sm_121|ptxas.*error|CUDA_ARCHITECTURES' "${LOG}"; then
     echo "==> primary build failed (likely MXFP4 / arch); falling back to 121 + GGML_NATIVE=OFF"
     configure_and_build "121" -DGGML_NATIVE=OFF
+    BUILT_ARCH="121+GGML_NATIVE=OFF"
   else
     echo "error: build failed; see log above" >&2
     exit "${STATUS}"
   fi
 fi
+
+# Record which arch actually built: bench/eval runs embed this so numbers taken on the
+# slower fallback build are never silently compared with 121a-real numbers.
+echo "${BUILT_ARCH}" > "${VENDOR}/build/spark-arch.txt"
+echo "==> recorded CUDA arch ${BUILT_ARCH} in build/spark-arch.txt"
 
 SERVER="${VENDOR}/build/bin/llama-server"
 if [[ ! -x "${SERVER}" ]]; then

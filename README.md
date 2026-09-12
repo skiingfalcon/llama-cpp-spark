@@ -160,6 +160,71 @@ Runtime also needs Blackwell compat libs on `LD_LIBRARY_PATH` (handled by `scrip
 
 `/usr/local/cuda-13/compat` (or `/usr/local/cuda/compat`).
 
+## Benchmarking and model comparison
+
+Three different questions hide behind "which model is faster/better"; the CLI keeps them apart.
+
+| Command | Measures | Does **not** measure |
+| --- | --- | --- |
+| `spark-llm bench A B` | Raw pp/tg tokens per second via `llama-bench`, using the exact served batch/ubatch/ngl/flash-attn/KV settings. Saved to `state/bench/*.json` with build provenance. | Task quality, chat template, serving latency under load. |
+| `spark-llm eval sec …` | Accuracy on real 10-K/10-Q filings (XBRL ground truth), plus TTFT / prefill / decode by input length, cold vs warm prefix cache, and throughput under concurrency. | Anything outside filings. |
+| `spark-llm eval swe …` | Coding ability through the served endpoint in three tiers: HumanEval+/MBPP+ (evalplus), Aider polyglot (edit-format compliance), a fixed 50-instance SWE-bench Verified subset (mini-swe-agent + swebench harness). Records tool-call/format failure rates. | Full SWE-bench. |
+
+Every eval run is written to `state/evals/<suite>/<model>/<timestamp>-<task>/` as `run.json`
+(model, GGUF, llama.cpp commit, CUDA arch actually built, server `/props`, decoding settings,
+config hash) plus `results.jsonl`. `spark-llm eval report --suite sec|swe` tabulates the
+latest finished run per model and warns when runs used different configs.
+
+Rules the harness enforces so numbers stay comparable:
+
+- **Bench refuses to run while a tracked server or foreign GPU process is alive** (`--force` to override).
+- **Quality tasks decode at temperature 0 with a fixed seed**; per-model sampling from `models.toml` is only used for serving/perf.
+- **The CUDA arch that actually built is recorded** (`build/spark-arch.txt`); a `121 + GGML_NATIVE=OFF` fallback build is flagged in reports rather than silently compared to `121a-real`.
+
+### SEC suite
+
+```bash
+export SPARK_LLM_EDGAR_USER_AGENT="spark-llm you@example.com"   # EDGAR fair-access requirement
+uv run spark-llm eval sec fetch                                  # 12 companies × (1×10-K + 3×10-Q) + XBRL facts
+uv run spark-llm serve gpt-oss-20b
+uv run spark-llm eval sec run gpt-oss-20b --task extract-full    # whole filing in context
+uv run spark-llm eval sec run gpt-oss-20b --task extract-chunked # BM25 top-k chunks (works for 8k-ctx models)
+uv run spark-llm eval sec run gpt-oss-20b --task qa-financebench # needs the judge model served too
+uv run spark-llm eval sec perf gpt-oss-20b                       # 8k/32k/64k/100k tokens, cold vs warm, concurrency 1,4
+uv run spark-llm eval report --suite sec
+```
+
+Ground truth for `extract-*` comes from EDGAR's XBRL company facts (revenue, net income, EPS,
+assets, cash flow, …), matched with 0.5 % tolerance; answers that are right except for a
+thousands/millions scale error are counted separately (`off_by_scale`). Filings that do not
+fit the served context are skipped with the reason recorded, so an 8k-ctx model shows up as
+"chunked only" instead of failing silently. Companies, tags, chunk size and tolerances live in
+[`evals.toml`](evals.toml); prompts live in `evals/prompts/`.
+
+Filing work needs context: a 10-K is roughly 50k–150k tokens. Raise `ctx_size` in
+`models.toml` (and consider `cache_type_k`/`cache_type_v = "q8_0"`, `n_parallel`) for the
+models you want on the full-document path. llama-server splits `--ctx-size` across
+`--parallel` slots.
+
+### SWE suite
+
+```bash
+uv run spark-llm eval swe check gpt-oss-20b              # tool-call smoke test through --jinja; run first
+uv run spark-llm eval swe run gpt-oss-20b --tier 1       # evalplus humaneval+mbpp (minutes)
+uv run spark-llm eval swe run gpt-oss-20b --tier 2       # aider polyglot (Docker, ~1 h)
+uv run spark-llm eval swe run gpt-oss-20b --tier 3       # SWE-bench Verified ×50 (Docker, hours)
+uv run spark-llm eval swe run gpt-oss-20b --tier 3 --dry-run   # print the harness commands only
+uv run spark-llm eval report --suite swe
+```
+
+External harnesses run via `uvx` with the versions pinned in `evals.toml` and are never
+vendored. Tiers 2 and 3 need Docker; the SWE-bench scoring images are x86_64-first, so the
+intended layout is: Spark serves the model, an x86 box runs `spark-llm eval swe … --host <spark>`
+(or `SPARK_LLM_EVAL_HOST`). The Tier 3 instance list is a seeded sample committed in
+`evals.toml` so every model sees the same 50 tasks. Tier 2/3 command lines were written from
+the harnesses' documented interfaces but have not been executed on this dev box (no Docker);
+run `--dry-run` and check them against the pinned versions before a long run.
+
 ## Running several models at once
 
 Each registry entry has its own `port`. Unified memory on the Spark can hold a chat model and an embedding model together:
@@ -188,10 +253,14 @@ PIDs and logs live under `state/`.
 ```
 llama-cpp-spark/
   models.toml          # model registry (edit this to add models)
+  evals.toml           # eval suites: SEC companies/tags, SWE tiers (data, not code)
+  evals/prompts/       # prompt templates used by the evals
   LLAMA_CPP_VERSION    # pinned llama.cpp commit
   scripts/build.sh     # CUDA native build
   scripts/env.sh       # LD_LIBRARY_PATH for GB10
-  src/spark_llm/       # CLI + argv merge + download
+  src/spark_llm/       # CLI + argv merge + download + bench
+  src/spark_llm/evals/ # endpoint client, run records, SEC + SWE suites, report
+  state/bench, state/evals  # persisted results (gitignored)
   tests/               # no-GPU unit tests
   vendor/llama.cpp/    # gitignored clone + build tree
 ```

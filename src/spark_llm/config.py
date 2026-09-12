@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     health_timeout_s: float = 300.0
     health_poll_s: float = 1.0
 
+    # Evaluation harness
+    evals_toml: Path = Field(default_factory=lambda: repo_root() / "evals.toml")
+    evals_data_dir: Path = Field(default_factory=lambda: repo_root() / "evals" / "data")
+    eval_host: str = "127.0.0.1"  # set to the Spark's address when driving from another box
+    # EDGAR requires a descriptive UA: "App Name contact@email" (SPARK_LLM_EDGAR_USER_AGENT)
+    edgar_user_agent: str | None = None
+
 
 def get_settings() -> Settings:
     return Settings()

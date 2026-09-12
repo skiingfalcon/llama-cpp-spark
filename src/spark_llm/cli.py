@@ -1,4 +1,4 @@
-"""Typer CLI: build, models, download, serve, chat, bench, doctor, stop."""
+"""Typer CLI: build, models, download, serve, chat, bench, eval, doctor, stop."""
 
 from __future__ import annotations
 
@@ -12,10 +12,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from spark_llm.bench import print_bench_output, run_bench
+from spark_llm.bench import BenchOptions, compare_runs, print_bench_run, run_bench
 from spark_llm.client import chat_once
 from spark_llm.config import get_settings, repo_root
-from spark_llm.download import download_hf_ref, download_model, resolve_local
+from spark_llm.download import download_hf_ref, download_model, resolve_weights
+from spark_llm.evals.cli import eval_app
+from spark_llm.gpu import split_gpu_processes
+from spark_llm.provenance import built_cuda_arch
 from spark_llm.registry import ModelKind, ModelSpec, load_registry
 from spark_llm.server import (
     ServeOverrides,
@@ -35,6 +38,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+app.add_typer(eval_app, name="eval")
 
 
 def _passthrough(ctx: typer.Context) -> list[str]:
@@ -64,7 +68,7 @@ def models_cmd() -> None:
     table.add_column("local")
     for name, spec in sorted(reg.models.items()):
         src = spec.file or spec.hf_ref() or "-"
-        local = resolve_local(spec, settings.models_dir)
+        local = resolve_weights(spec, settings.models_dir)
         table.add_row(
             name,
             spec.kind.value,
@@ -193,7 +197,7 @@ def stop(
 
 @app.command()
 def chat(
-    name: str = typer.Argument("gpt-oss-20b", help="Registered model (for port lookup)"),
+    name: str = typer.Argument(..., help="Registered model (for port lookup)"),
     message: str = typer.Option(..., "--message", "-m", help="User message"),
     port: int | None = typer.Option(None, "--port"),
     system: str | None = typer.Option(None, "--system"),
@@ -213,18 +217,57 @@ def chat(
         console.print(result)
 
 
+def _int_list(raw: str) -> list[int]:
+    return [int(x) for x in raw.split(",") if x.strip()]
+
+
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
 def bench(
     ctx: typer.Context,
-    name: str = typer.Argument("gpt-oss-20b"),
+    names: list[str] | None = typer.Argument(None, help="Registered model name(s)"),
+    pp: str = typer.Option("512,4096", "--pp", help="Prompt sizes (llama-bench -p)"),
+    tg: str = typer.Option("128", "--tg", help="Generation sizes (llama-bench -n)"),
+    depth: str = typer.Option(
+        "0,16384,65536", "--depth", help="KV depths (llama-bench -d); filtered by ctx_size"
+    ),
+    reps: int = typer.Option(5, "--reps", help="Repetitions per test (llama-bench -r)"),
+    force: bool = typer.Option(False, "--force", help="Bench even if the GPU is busy"),
+    compare: list[Path] | None = typer.Option(
+        None, "--compare", help="Two saved state/bench/*.json files to diff (no bench run)"
+    ),
 ) -> None:
-    """Run llama-bench for a registered model."""
+    """Kernel-throughput smoke test (llama-bench) using the exact served configuration.
+
+    Measures pp/tg tokens per second only. For task quality and serving latency use
+    `spark-llm eval`. Results are saved to state/bench/<timestamp>.json with build
+    provenance. Extra args after `--` are appended verbatim to llama-bench.
+    """
+    if compare:
+        if len(compare) != 2:
+            console.print("[red]--compare takes exactly two files[/red]")
+            raise typer.Exit(1)
+        console.print(compare_runs(compare[0], compare[1]))
+        return
+    if not names:
+        console.print("[red]provide at least one registered model name[/red]")
+        raise typer.Exit(1)
     settings = get_settings()
-    reg = load_registry(settings=settings)
-    raw = run_bench(reg.get(name), settings, extra_args=_passthrough(ctx))
-    print_bench_output(raw)
+    opts = BenchOptions(
+        pp=_int_list(pp),
+        tg=_int_list(tg),
+        depth=_int_list(depth),
+        reps=reps,
+        force=force,
+        extra_args=_passthrough(ctx),
+    )
+    try:
+        run = run_bench(names, settings, opts)
+    except (FileNotFoundError, RuntimeError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    print_bench_run(run)
 
 
 @app.command()
@@ -260,30 +303,13 @@ def doctor() -> None:
             text=True,
         ).strip()
         check("gpu", "GB10" in out or "12.1" in out, out)
-        procs = subprocess.check_output(
-            [
-                "nvidia-smi",
-                "--query-compute-apps=pid,process_name,used_gpu_memory",
-                "--format=csv,noheader",
-            ],
-            text=True,
-        ).strip()
-        tracked_pids = {int(info["pid"]) for info in load_state(settings).values()}
-        foreign = []
-        ours = []
-        if procs:
-            for line in procs.splitlines():
-                pid_s = line.split(",", 1)[0].strip()
-                try:
-                    pid = int(pid_s)
-                except ValueError:
-                    foreign.append(line)
-                    continue
-                (ours if pid in tracked_pids else foreign).append(line)
+        ours, foreign = split_gpu_processes(settings)
         if foreign:
-            check("gpu free", False, "; ".join(foreign))
+            check("gpu free", False, "; ".join(p.raw for p in foreign))
         elif ours:
-            console.print(f"[yellow]note[/yellow]  gpu in use by spark-llm: {'; '.join(ours)}")
+            console.print(
+                f"[yellow]note[/yellow]  gpu in use by spark-llm: {'; '.join(p.raw for p in ours)}"
+            )
         else:
             check("gpu free", True, "no compute apps")
 
@@ -304,6 +330,12 @@ def doctor() -> None:
             check("llama-server version", True, ver.splitlines()[0][:120])
         except Exception as exc:  # noqa: BLE001
             check("llama-server version", False, str(exc))
+        arch = built_cuda_arch(settings)
+        check(
+            "cuda arch",
+            arch is not None and arch.startswith("121a"),
+            arch or "unknown (rebuild with make build to record it)",
+        )
 
     check("models.toml", settings.models_toml.is_file(), str(settings.models_toml))
     check("models_dir", settings.models_dir.is_dir(), str(settings.models_dir))

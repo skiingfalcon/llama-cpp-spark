@@ -45,13 +45,36 @@ def resolve_local(spec: ModelSpec, models_dir: Path) -> Path | None:
     return matches[0] if matches else None
 
 
+def resolve_weights(spec: ModelSpec, models_dir: Path) -> Path | None:
+    """Return the local primary GGUF for a spec, whether declared by ``file`` or ``repo``/``quant``.
+
+    Mirrors the two storage layouts ``download_model`` produces: an explicit ``file`` under
+    ``models_dir`` (possibly nested), or a ``<org>__<repo>`` snapshot directory filtered by
+    quant. Returns None when nothing is on disk.
+    """
+    if spec.file:
+        return resolve_local(spec, models_dir)
+    snap = spec.snapshot_dir(models_dir)
+    if snap is None or not snap.is_dir():
+        return None
+    ggufs = sorted(snap.rglob("*.gguf"))
+    if spec.quant:
+        filtered = [g for g in ggufs if spec.quant.lower() in g.name.lower()]
+        ggufs = filtered or ggufs
+    if not ggufs:
+        return None
+    # Multi-shard repos: point at the first shard; llama.cpp loads siblings.
+    first = [g for g in ggufs if "-00001-of-" in g.name]
+    return first[0] if first else ggufs[0]
+
+
 def download_model(spec: ModelSpec, settings: Settings | None = None) -> Path:
     """Download model weights into settings.models_dir; return primary GGUF path."""
     settings = settings or get_settings()
     models_dir = settings.models_dir
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    existing = resolve_local(spec, models_dir)
+    existing = resolve_weights(spec, models_dir)
     if existing is not None:
         console.print(f"[green]already present[/green] {existing}")
         return existing

@@ -14,7 +14,7 @@ import httpx
 from rich.console import Console
 
 from spark_llm.config import Settings, get_settings, repo_root
-from spark_llm.download import resolve_local
+from spark_llm.download import resolve_weights
 from spark_llm.registry import Defaults, ModelKind, ModelSpec, Registry, load_registry
 
 console = Console(stderr=True)
@@ -31,6 +31,35 @@ class ServeOverrides:
     model_path: Path | None = None
     hf: str | None = None
     extra_args: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RuntimeParams:
+    """The merged runtime configuration shared by llama-server and llama-bench.
+
+    Produced by :func:`merge_runtime`; both ``build_argv`` (serve) and ``bench.bench_argv``
+    consume it so that what gets benchmarked is exactly what gets served.
+    """
+
+    host: str
+    port: int
+    n_gpu_layers: int
+    flash_attn: str
+    batch_size: int
+    ubatch_size: int
+    ctx_size: int | None
+    n_parallel: int | None
+    cache_type_k: str | None
+    cache_type_v: str | None
+    model_path: Path | None
+    hf_ref: str | None
+    kind: ModelKind
+
+    def as_dict(self) -> dict[str, object]:
+        d = self.__dict__.copy()
+        d["model_path"] = str(self.model_path) if self.model_path else None
+        d["kind"] = self.kind.value
+        return d
 
 
 def kind_flags(kind: ModelKind) -> list[str]:
@@ -60,70 +89,140 @@ def runtime_env(settings: Settings) -> dict[str, str]:
     return env
 
 
+def _first(*values):  # type: ignore[no-untyped-def]
+    for v in values:
+        if v is not None:
+            return v
+    return None
+
+
+def resolve_model_source(
+    spec: ModelSpec | None,
+    settings: Settings,
+    overrides: ServeOverrides | None = None,
+) -> tuple[Path | None, str | None]:
+    """(local_path, hf_ref): CLI path > CLI -hf > local weights (file/snapshot) > model hf_ref."""
+    overrides = overrides or ServeOverrides()
+    if overrides.model_path is not None:
+        return overrides.model_path, None
+    if overrides.hf:
+        return None, overrides.hf
+    if spec is None:
+        raise ValueError("need a ModelSpec or --model-path / --hf")
+    local = resolve_weights(spec, settings.models_dir)
+    if local is not None:
+        return local, None
+    ref = spec.hf_ref()
+    if ref:
+        return None, ref
+    if spec.file:
+        return settings.models_dir / spec.file, None
+    raise ValueError(f"model {spec.name!r} has no resolvable weights path")
+
+
+def merge_runtime(
+    spec: ModelSpec | None,
+    defaults: Defaults,
+    settings: Settings,
+    overrides: ServeOverrides | None = None,
+) -> RuntimeParams:
+    """Merge defaults <- per-model overrides <- CLI overrides into one RuntimeParams.
+
+    Layers never hard-code knowledge of a specific model name.
+    """
+    overrides = overrides or ServeOverrides()
+    s = spec
+    model_path, hf_ref = resolve_model_source(spec, settings, overrides)
+    return RuntimeParams(
+        host=_first(overrides.host, s.host if s else None, defaults.host, settings.host),
+        port=_first(overrides.port, s.port if s else None, settings.base_port),
+        n_gpu_layers=_first(
+            overrides.n_gpu_layers, s.n_gpu_layers if s else None, defaults.n_gpu_layers
+        ),
+        flash_attn=_first(s.flash_attn if s else None, defaults.flash_attn),
+        batch_size=_first(s.batch_size if s else None, defaults.batch_size),
+        ubatch_size=_first(s.ubatch_size if s else None, defaults.ubatch_size),
+        ctx_size=_first(overrides.ctx_size, s.ctx_size if s else None),
+        n_parallel=_first(s.n_parallel if s else None, defaults.n_parallel),
+        cache_type_k=_first(s.cache_type_k if s else None, defaults.cache_type_k),
+        cache_type_v=_first(s.cache_type_v if s else None, defaults.cache_type_v),
+        model_path=model_path,
+        hf_ref=hf_ref,
+        kind=s.kind if s else ModelKind.chat,
+    )
+
+
+_VALUED_FLAGS = {
+    "-m",
+    "-hf",
+    "--host",
+    "--port",
+    "--n-gpu-layers",
+    "--flash-attn",
+    "--batch-size",
+    "--ubatch-size",
+    "--ctx-size",
+    "--parallel",
+    "--cache-type-k",
+    "--cache-type-v",
+    "--mmproj",
+    "--temp",
+    "--top-p",
+    "--top-k",
+    "--min-p",
+}
+_DEDUP_FLAGS = {"--embeddings", "--reranking", "--jinja"}
+
+
+def _dedupe(argv: list[str]) -> list[str]:
+    """Drop repeated boolean kind flags (they may also appear in extra_args)."""
+    seen: set[str] = set()
+    out: list[str] = []
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok in _VALUED_FLAGS:
+            out.extend(argv[i : i + 2])
+            i += 2
+            continue
+        if tok in _DEDUP_FLAGS and tok in seen:
+            i += 1
+            continue
+        if tok.startswith("-"):
+            seen.add(tok)
+        out.append(tok)
+        i += 1
+    return out
+
+
 def build_argv(
     spec: ModelSpec | None,
     defaults: Defaults,
     settings: Settings,
     overrides: ServeOverrides | None = None,
 ) -> list[str]:
-    """Merge defaults <- kind flags <- model overrides <- CLI overrides into argv.
-
-    Layers never hard-code knowledge of a specific model name.
-    """
+    """Merge defaults <- kind flags <- model overrides <- CLI overrides into llama-server argv."""
     overrides = overrides or ServeOverrides()
-    server = binary_path(settings)
-    argv: list[str] = [str(server)]
+    rt = merge_runtime(spec, defaults, settings, overrides)
+    argv: list[str] = [str(binary_path(settings))]
 
-    host = overrides.host or (spec.host if spec else None) or defaults.host or settings.host
-    port = (
-        overrides.port
-        if overrides.port is not None
-        else (spec.port if spec and spec.port is not None else settings.base_port)
-    )
-    ngl = (
-        overrides.n_gpu_layers
-        if overrides.n_gpu_layers is not None
-        else (
-            spec.n_gpu_layers if spec and spec.n_gpu_layers is not None else defaults.n_gpu_layers
-        )
-    )
-    flash = (spec.flash_attn if spec and spec.flash_attn else None) or defaults.flash_attn
-    batch = (
-        spec.batch_size if spec and spec.batch_size is not None else None
-    ) or defaults.batch_size
-    ubatch = (
-        spec.ubatch_size if spec and spec.ubatch_size is not None else None
-    ) or defaults.ubatch_size
-    ctx = overrides.ctx_size
-    if ctx is None and spec is not None:
-        ctx = spec.ctx_size
-
-    # Model source: CLI path > CLI -hf > local file > model hf_ref
-    if overrides.model_path is not None:
-        argv.extend(["-m", str(overrides.model_path)])
-    elif overrides.hf:
-        argv.extend(["-hf", overrides.hf])
-    elif spec is not None:
-        local = resolve_local(spec, settings.models_dir) if spec.file else None
-        if local is not None:
-            argv.extend(["-m", str(local)])
-        else:
-            ref = spec.hf_ref()
-            if ref:
-                argv.extend(["-hf", ref])
-            elif spec.file:
-                argv.extend(["-m", str(settings.models_dir / spec.file)])
-            else:
-                raise ValueError(f"model {spec.name!r} has no resolvable weights path")
+    if rt.model_path is not None:
+        argv.extend(["-m", str(rt.model_path)])
     else:
-        raise ValueError("need a ModelSpec or --model-path / --hf")
+        argv.extend(["-hf", str(rt.hf_ref)])
 
-    argv.extend(["--host", host, "--port", str(port)])
-    argv.extend(["--n-gpu-layers", str(ngl)])
-    argv.extend(["--flash-attn", str(flash)])
-    argv.extend(["--batch-size", str(batch), "--ubatch-size", str(ubatch)])
-    if ctx is not None:
-        argv.extend(["--ctx-size", str(ctx)])
+    argv.extend(["--host", rt.host, "--port", str(rt.port)])
+    argv.extend(["--n-gpu-layers", str(rt.n_gpu_layers)])
+    argv.extend(["--flash-attn", str(rt.flash_attn)])
+    argv.extend(["--batch-size", str(rt.batch_size), "--ubatch-size", str(rt.ubatch_size)])
+    if rt.ctx_size is not None:
+        argv.extend(["--ctx-size", str(rt.ctx_size)])
+    if rt.n_parallel is not None:
+        argv.extend(["--parallel", str(rt.n_parallel)])
+    if rt.cache_type_k:
+        argv.extend(["--cache-type-k", rt.cache_type_k])
+    if rt.cache_type_v:
+        argv.extend(["--cache-type-v", rt.cache_type_v])
 
     if spec is not None:
         argv.extend(kind_flags(spec.kind))
@@ -144,50 +243,7 @@ def build_argv(
                 argv.extend(["--min-p", str(s.min_p)])
         argv.extend(spec.extra_args)
 
-    # Deduplicate kind flags that may also appear in extra_args
-    seen: set[str] = set()
-    deduped: list[str] = []
-    i = 0
-    while i < len(argv):
-        tok = argv[i]
-        # keep valued flags paired
-        if tok in {
-            "-m",
-            "-hf",
-            "--host",
-            "--port",
-            "--n-gpu-layers",
-            "--flash-attn",
-            "--batch-size",
-            "--ubatch-size",
-            "--ctx-size",
-            "--mmproj",
-            "--temp",
-            "--top-p",
-            "--top-k",
-            "--min-p",
-        }:
-            deduped.extend(argv[i : i + 2])
-            i += 2
-            continue
-        if (
-            tok.startswith("-")
-            and tok in seen
-            and tok
-            in {
-                "--embeddings",
-                "--reranking",
-                "--jinja",
-            }
-        ):
-            i += 1
-            continue
-        if tok.startswith("-"):
-            seen.add(tok)
-        deduped.append(tok)
-        i += 1
-    argv = deduped
-
+    argv = _dedupe(argv)
     argv.extend(overrides.extra_args)
     return argv
 
@@ -208,8 +264,8 @@ def save_state(settings: Settings, state: dict[str, dict]) -> None:
     state_file(settings).write_text(json.dumps(state, indent=2) + "\n")
 
 
-def wait_healthy(port: int, timeout_s: float, poll_s: float) -> None:
-    url = f"http://127.0.0.1:{port}/health"
+def wait_healthy(port: int, timeout_s: float, poll_s: float, host: str = "127.0.0.1") -> None:
+    url = f"http://{host}:{port}/health"
     deadline = time.time() + timeout_s
     last_err: Exception | None = None
     with httpx.Client(timeout=2.0) as client:
@@ -221,7 +277,7 @@ def wait_healthy(port: int, timeout_s: float, poll_s: float) -> None:
             except Exception as exc:  # noqa: BLE001 — probe until timeout
                 last_err = exc
             time.sleep(poll_s)
-    raise TimeoutError(f"server on :{port} not healthy within {timeout_s}s ({last_err})")
+    raise TimeoutError(f"server on {host}:{port} not healthy within {timeout_s}s ({last_err})")
 
 
 def start_server(
