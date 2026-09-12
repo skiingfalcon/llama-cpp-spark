@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+.pytest_cache/
+.ruff_cache/
+*.egg
+
+# llama.cpp vendor build (cloned + compiled locally)
+vendor/
+
+# Local model copies (shared store is /opt/models)
+models/
+*.gguf
+
+# Runtime state (PIDs, llama-server logs)
+state/
+.state/
+*.pid
+.env
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
