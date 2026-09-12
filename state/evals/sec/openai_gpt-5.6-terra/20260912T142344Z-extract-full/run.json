@@ -1,0 +1,117 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "openai:gpt-5.6-terra",
+  "started": "2026-09-12T14:23:44+00:00",
+  "finished": "2026-09-12T14:43:47+00:00",
+  "provenance": {
+    "timestamp": "2026-09-12T14:23:44+00:00",
+    "hostname": "spark-780e",
+    "machine": "aarch64",
+    "spark_llm_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": "82d6bb284d1f",
+    "cuda_arch": null,
+    "binary_version": null,
+    "gpu": {}
+  },
+  "server": {
+    "provider": "openai",
+    "api": "chat_completions",
+    "model": "gpt-5.6-terra",
+    "base_url": "https://api.openai.com/v1",
+    "n_ctx_per_slot": 1050000
+  },
+  "runtime": {
+    "provider": "openai",
+    "model": "gpt-5.6-terra",
+    "context_window": 1050000
+  },
+  "quality": {
+    "temperature": null,
+    "seed": null,
+    "max_tokens": 4096,
+    "reasoning_effort": null,
+    "note": "provider defaults; frontier reasoning models reject fixed temperature/seed"
+  },
+  "task_config": {
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      "Revenues",
+      "NetIncomeLoss",
+      "OperatingIncomeLoss",
+      "EarningsPerShareDiluted",
+      "NetCashProvidedByUsedInOperatingActivities",
+      "Assets",
+      "Liabilities",
+      "StockholdersEquity",
+      "CashAndCashEquivalentsAtCarryingValue",
+      "LongTermDebtNoncurrent",
+      "CommonStockSharesOutstanding"
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "ea71250ebf92",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "scored": 121,
+    "correct": 120,
+    "score": 0.9917355371900827,
+    "skipped": 0,
+    "errors": 0,
+    "off_by_scale": 0,
+    "truncated": 0,
+    "ttft_p50_s": 1.4356723859964404,
+    "ttft_p95_s": 2.7088537539966637,
+    "total_p50_s": 1.5532264829962514,
+    "total_p95_s": 2.869570727001701,
+    "prompt_tps_p50": null,
+    "decode_tps_p50": null,
+    "total_tokens": 12394653,
+    "cached_prompt_tokens": 0,
+    "reasoning_tokens": 1260,
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 120
+      }
+    },
+    "by_mode": {
+      "full": {
+        "n": 121,
+        "correct": 120
+      }
+    },
+    "fallback": 0
+  },
+  "n_results": 121
+}

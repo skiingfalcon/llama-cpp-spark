@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from spark_llm.config import Settings
@@ -167,6 +168,84 @@ def test_report_pairs_on_items_every_run_answered(tmp_path: Path) -> None:
     assert "### Paired" in md
     assert "| extract-full | b | 2 | 2 | 1 |" in md
     assert "| extract-full | a | 2 | 1 | 0.5 |" in md
+
+
+def test_report_compares_latest_oss_and_terra(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    # 20b: misses item 2 (full) and item 3 (fallback). 120b: all correct, item 3 fallback.
+    # Terra: all correct, no fallback (full 1.05M window). Older 20b run must be ignored.
+    specs = [
+        ("gpt-oss-20b", [("1", True, False), ("2", True, False)], "old"),
+        (
+            "gpt-oss-20b",
+            [("1", True, False), ("2", False, False), ("3", False, True)],
+            "new",
+        ),
+        (
+            "gpt-oss-120b",
+            [("1", True, False), ("2", True, False), ("3", True, True)],
+            "new",
+        ),
+        (
+            "openai:gpt-5.6-terra",
+            [("1", True, False), ("2", True, False), ("3", True, False)],
+            "new",
+        ),
+    ]
+    for model, items, gen in specs:
+        w = RunWriter(settings, "sec", "extract-full", model, provenance=_prov(), server={})
+        for i, correct, fallback in items:
+            w.write(
+                {
+                    "id": f"AAPL:10-K:{i}",
+                    "ticker": "AAPL" if i != "3" else "GS",
+                    "tag": "Assets" if i != "2" else "Revenues",
+                    "skipped": False,
+                    "correct": correct,
+                    "fallback": fallback,
+                    "mode": "section" if fallback else "full",
+                }
+            )
+        fallback_n = sum(1 for _, _, fb in items if fb)
+        w.finish(
+            {
+                "n": len(items),
+                "scored": len(items),
+                "score": sum(c for _, c, _ in items) / len(items),
+                "fallback": fallback_n,
+                "by_mode": {
+                    "full": {
+                        "n": sum(1 for _, _, fb in items if not fb),
+                        "correct": sum(c for _, c, fb in items if not fb),
+                    },
+                    **(
+                        {
+                            "section": {
+                                "n": fallback_n,
+                                "correct": sum(c for _, c, fb in items if fb),
+                            }
+                        }
+                        if fallback_n
+                        else {}
+                    ),
+                },
+            }
+        )
+        if gen == "old":
+            time.sleep(1)
+    _, md = build_report(latest_runs(settings, "sec"))
+    assert "### extract-full: gpt-oss vs Terra" in md
+    assert "202" in md  # run directory stamp mentioned
+    assert "Accuracy slices" in md
+    assert "paired (all three answered)" in md
+    assert "OSS fallback filings" in md
+    # Latest 20b is 1/3, not the older 2/2 run.
+    assert "1/3 (0.333)" in md
+    assert "3/3 (1.000)" in md
+    # Disagreement on item 2 (20b miss) and item 3 (20b miss on fallback).
+    assert "Disagreements" in md
+    assert "AAPL:10-K:2" in md
+    assert "By tag" in md and "By company" in md
 
 
 def test_report_has_truncated_column(tmp_path: Path) -> None:

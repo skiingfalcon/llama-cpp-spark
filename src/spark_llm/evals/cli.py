@@ -212,7 +212,7 @@ def report(
     models: str | None = typer.Option(None, "--models", help="Comma-separated model filter"),
     runs: list[Path] | None = typer.Option(None, "--run", help="Specific run directories"),
 ) -> None:
-    """Cross-model table over the latest finished run per (model, task), also as markdown."""
+    """Latest run per model, plus a gpt-oss vs Terra comparison when those runs exist."""
     settings = get_settings()
     run_dirs = runs or latest_runs(settings, suite, _csv(models) or None)
     if not run_dirs:

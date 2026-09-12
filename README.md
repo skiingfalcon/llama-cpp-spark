@@ -173,7 +173,10 @@ Three different questions hide behind "which model is faster/better"; the CLI ke
 Every eval run is written to `state/evals/<suite>/<model>/<timestamp>-<task>/` as `run.json`
 (model, GGUF, llama.cpp commit, CUDA arch actually built, server `/props`, decoding settings,
 config hash) plus `results.jsonl`. `spark-llm eval report --suite sec|swe` tabulates the
-latest finished run per model and warns when runs used different configs.
+latest finished run per model and warns when runs used different configs. When the latest
+gpt-oss-20b, gpt-oss-120b, and OpenAI/Terra extract runs are present, the report adds a
+comparison: paired score, full-document vs oversized-filing fallback, per-tag / per-company
+tables, and item-level disagreements.
 
 Rules the harness enforces so numbers stay comparable:
 

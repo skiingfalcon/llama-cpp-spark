@@ -94,6 +94,30 @@ PAIRED_COLUMNS = [
 ]
 
 
+def _answered(r: dict[str, Any]) -> bool:
+    return not r.get("skipped") and r.get("correct") is not None
+
+
+def _is_oss(model: str) -> bool:
+    return "gpt-oss" in model
+
+
+def _is_frontier(model: str) -> bool:
+    return model.startswith("openai:") or "terra" in model.lower()
+
+
+def _load_task_runs(
+    run_dirs: list[Path],
+) -> dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]]:
+    by_task: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
+    for d in run_dirs:
+        rec = load_run(d)
+        results = {r["id"]: r for r in load_results(d) if r.get("id")}
+        if results:
+            by_task.setdefault(rec.task, []).append((rec, d, results))
+    return by_task
+
+
 def paired_rows(run_dirs: list[Path]) -> list[dict[str, Any]]:
     """Like-for-like scores over the items every run of a task answered (none skipped).
 
@@ -101,22 +125,13 @@ def paired_rows(run_dirs: list[Path]) -> list[dict[str, Any]]:
     filings (context limit, rate limit) looks better than one that attempted them. Pairing
     fixes the denominator.
     """
-    by_task: dict[str, list[tuple[RunRecord, dict[str, dict[str, Any]]]]] = {}
-    for d in run_dirs:
-        rec = load_run(d)
-        results = {r["id"]: r for r in load_results(d) if r.get("id")}
-        if results:
-            by_task.setdefault(rec.task, []).append((rec, results))
     rows: list[dict[str, Any]] = []
-    for task, runs in sorted(by_task.items()):
+    for task, runs in sorted(_load_task_runs(run_dirs).items()):
         if len(runs) < 2:
             continue
-        answered = [
-            {i for i, r in results.items() if not r.get("skipped") and r.get("correct") is not None}
-            for _, results in runs
-        ]
+        answered = [{i for i, r in results.items() if _answered(r)} for _, _, results in runs]
         common = set.intersection(*answered)
-        for rec, results in runs:
+        for rec, _, results in runs:
             correct = sum(int(bool(results[i]["correct"])) for i in common)
             rows.append(
                 {
@@ -129,6 +144,201 @@ def paired_rows(run_dirs: list[Path]) -> list[dict[str, Any]]:
             )
     rows.sort(key=lambda r: (r["task"], -(r["score"] or 0)))
     return rows
+
+
+def _score_on(results: dict[str, dict[str, Any]], ids: set[str]) -> tuple[int, int, float | None]:
+    hits = [results[i] for i in ids if i in results and _answered(results[i])]
+    if not hits:
+        return 0, 0, None
+    correct = sum(int(bool(r["correct"])) for r in hits)
+    return correct, len(hits), correct / len(hits)
+
+
+def _frac(correct: int, n: int) -> str:
+    if not n:
+        return "-"
+    return f"{correct}/{n} ({correct / n:.3f})"
+
+
+def _verdict(r: dict[str, Any] | None) -> str:
+    if r is None:
+        return "-"
+    if r.get("skipped") or r.get("correct") is None:
+        return "skip"
+    return "ok" if r["correct"] else "miss"
+
+
+def _mark(r: dict[str, Any] | None) -> str:
+    flag = _verdict(r)
+    if flag in {"-", "skip"} or r is None:
+        return flag
+    mode = r.get("mode") or ""
+    if r.get("fallback") or (mode and mode != "full"):
+        return f"{flag}/{mode or 'fb'}"
+    return flag
+
+
+def _render_md(title: str, columns: list[tuple[str, str]], rows: list[dict[str, Any]]) -> str:
+    lines = [f"\n### {title}\n", "| " + " | ".join(t for t, _ in columns) + " |"]
+    lines.append("|" + "---|" * len(columns))
+    for r in rows:
+        lines.append("| " + " | ".join(_fmt(r[key]) for _, key in columns) + " |")
+    return "\n".join(lines)
+
+
+def _rich_table(title: str, columns: list[tuple[str, str]], rows: list[dict[str, Any]]) -> Table:
+    table = Table(title=title)
+    for heading, _ in columns:
+        table.add_column(heading)
+    for r in rows:
+        table.add_row(*(_fmt(r[key]) for _, key in columns))
+    return table
+
+
+def comparison_group(
+    run_dirs: list[Path],
+) -> dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]]:
+    """Latest gpt-oss runs plus the latest OpenAI/Terra run, grouped by task.
+
+    Emits a task only when at least two gpt-oss runs and one frontier run are present.
+    """
+    out: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
+    for task, runs in _load_task_runs(run_dirs).items():
+        oss = [r for r in runs if _is_oss(r[0].model)]
+        frontier = [r for r in runs if _is_frontier(r[0].model)]
+        if len(oss) < 2 or not frontier:
+            continue
+        picked = sorted(oss, key=lambda r: r[0].model) + frontier[-1:]
+        out[task] = picked
+    return out
+
+
+def _group_rows(
+    runs: list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]], field: str
+) -> list[dict[str, Any]]:
+    keys = sorted({(r.get(field) or "?") for _, _, res in runs for r in res.values()})
+    out: list[dict[str, Any]] = []
+    for key in keys:
+        ids = {i for _, _, res in runs for i, r in res.items() if (r.get(field) or "?") == key}
+        if not ids:
+            continue
+        row: dict[str, Any] = {field: key, "n": len(ids)}
+        for rec, _, results in runs:
+            c, n, _ = _score_on(results, ids)
+            row[rec.model] = _frac(c, n)
+        out.append(row)
+    return out
+
+
+def comparison_blocks(
+    run_dirs: list[Path],
+) -> tuple[list[Table], str]:
+    """Headline slices, per-tag / per-company scores, and disagreements for oss vs Terra."""
+    tables: list[Table] = []
+    md_parts: list[str] = []
+    for task, runs in sorted(comparison_group(run_dirs).items()):
+        models = [rec.model for rec, _, _ in runs]
+        dirs = [d.name for _, d, _ in runs]
+        heading = f"{task}: gpt-oss vs Terra"
+        md_parts.append(f"\n### {heading}\n")
+        md_parts.append(
+            "Latest finished gpt-oss-20b, gpt-oss-120b, and OpenAI/Terra runs. "
+            "`full` = whole filing in context; `section`/`chunked` = oversized-filing fallback. "
+            "Terra's 1.05M window still sees GS/STWD in full.\n"
+        )
+        compared = ", ".join(f"{m} (`{d}`)" for m, d in zip(models, dirs, strict=True))
+        md_parts.append(f"Compared: {compared}\n")
+
+        all_ids = set().union(*(results.keys() for _, _, results in runs))
+        answered = [{i for i, r in results.items() if _answered(r)} for _, _, results in runs]
+        paired = set.intersection(*answered) if answered else set()
+        oss_results = [results for rec, _, results in runs if _is_oss(rec.model)]
+        full_ids = {
+            i
+            for i in all_ids
+            if oss_results
+            and all(
+                (r := res.get(i)) is not None
+                and not r.get("fallback")
+                and (r.get("mode") or "full") == "full"
+                for res in oss_results
+            )
+        }
+        fallback_ids = {
+            i
+            for i in all_ids
+            if any(bool((res.get(i) or {}).get("fallback")) for res in oss_results)
+        }
+
+        slice_cols = [("slice", "slice"), ("n", "n")] + [(m, m) for m in models]
+        slice_rows: list[dict[str, Any]] = []
+        for label, ids in (
+            ("own scored (raw)", all_ids),
+            ("paired (all three answered)", paired),
+            ("full document (no OSS fallback)", full_ids),
+            ("OSS fallback filings", fallback_ids),
+        ):
+            row: dict[str, Any] = {
+                "slice": label,
+                "n": "-" if label == "own scored (raw)" else len(ids),
+            }
+            for rec, _, results in runs:
+                target = set(results) if label == "own scored (raw)" else ids
+                c, n, _ = _score_on(results, target)
+                row[rec.model] = _frac(c, n)
+            slice_rows.append(row)
+        tables.append(_rich_table(heading, slice_cols, slice_rows))
+        md_parts.append(_render_md("Accuracy slices", slice_cols, slice_rows))
+
+        mode_cols = [("model", "model"), ("fallback", "fallback"), ("by_mode", "by_mode")]
+        mode_rows = []
+        for rec, _, _ in runs:
+            by_mode = rec.summary.get("by_mode") or {}
+            mode_rows.append(
+                {
+                    "model": rec.model,
+                    "fallback": rec.summary.get("fallback", 0),
+                    "by_mode": ", ".join(
+                        f"{k} {v.get('correct', 0)}/{v.get('n', 0)}"
+                        for k, v in sorted(by_mode.items())
+                    )
+                    or "-",
+                }
+            )
+        tables.append(_rich_table(f"{task} context mode", mode_cols, mode_rows))
+        md_parts.append(_render_md("Context mode", mode_cols, mode_rows))
+
+        tag_cols = [("tag", "tag"), ("n", "n")] + [(m, m) for m in models]
+        tag_rows = _group_rows(runs, "tag")
+        if tag_rows:
+            tables.append(_rich_table(f"{task} by tag", tag_cols, tag_rows))
+            md_parts.append(_render_md("By tag", tag_cols, tag_rows))
+
+        ticker_cols = [("ticker", "ticker"), ("n", "n")] + [(m, m) for m in models]
+        ticker_rows = _group_rows(runs, "ticker")
+        if ticker_rows:
+            tables.append(_rich_table(f"{task} by company", ticker_cols, ticker_rows))
+            md_parts.append(_render_md("By company", ticker_cols, ticker_rows))
+
+        diffs: list[dict[str, Any]] = []
+        for i in sorted(all_ids):
+            verdicts = {_verdict(results.get(i)) for _, _, results in runs}
+            if len(verdicts) <= 1:
+                continue
+            sample = next(results[i] for _, _, results in runs if i in results)
+            diffs.append(
+                {
+                    "id": i,
+                    **{rec.model: _mark(results.get(i)) for rec, _, results in runs},
+                    "ticker": sample.get("ticker", "?"),
+                }
+            )
+        if diffs:
+            diff_cols = [("id", "id"), ("ticker", "ticker")] + [(m, m) for m in models]
+            tables.append(_rich_table(f"{task} disagreements", diff_cols, diffs))
+            md_parts.append(_render_md("Disagreements", diff_cols, diffs))
+
+    return tables, "\n".join(md_parts)
 
 
 def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
@@ -170,6 +380,11 @@ def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
             ptable.add_row(*cells)
             md.append("| " + " | ".join(cells) + " |")
         console.print(ptable)
+    cmp_tables, cmp_md = comparison_blocks(run_dirs)
+    for t in cmp_tables:
+        console.print(t)
+    if cmp_md:
+        md.append(cmp_md)
     return table, "\n".join(md) + "\n"
 
 
