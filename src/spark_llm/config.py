@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     eval_host: str = "127.0.0.1"  # set to the Spark's address when driving from another box
     # EDGAR requires a descriptive UA: "App Name contact@email" (SPARK_LLM_EDGAR_USER_AGENT)
     edgar_user_agent: str | None = None
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_context_window: int = 128000
 
 
 def get_settings() -> Settings:

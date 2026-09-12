@@ -20,9 +20,12 @@ COLUMNS = [
     ("score", "score"),
     ("skipped", "skipped"),
     ("ttft p50 s", "ttft_p50_s"),
+    ("total p50 s", "total_p50_s"),
     ("prompt t/s", "prompt_tps_p50"),
     ("decode t/s", "decode_tps_p50"),
     ("tokens", "total_tokens"),
+    ("cached", "cached_prompt_tokens"),
+    ("reasoning", "reasoning_tokens"),
     ("ctx", "n_ctx"),
     ("build", "build"),
     ("note", "note"),
@@ -39,6 +42,13 @@ def _fmt(v: Any) -> str:
 
 def row_for(rec: RunRecord) -> dict[str, Any]:
     s = rec.summary
+    provider = rec.server.get("provider")
+    build = (
+        f"{provider}/api"
+        if provider
+        else f"{rec.provenance.llama_cpp_checkout or rec.provenance.llama_cpp_pinned or '?'}"
+        f"/{rec.provenance.cuda_arch or '?'}"
+    )
     return {
         "model": rec.model,
         "task": rec.task,
@@ -46,13 +56,15 @@ def row_for(rec: RunRecord) -> dict[str, Any]:
         "score": s.get("score"),
         "skipped": s.get("skipped", 0),
         "ttft_p50_s": s.get("ttft_p50_s"),
+        "total_p50_s": s.get("total_p50_s"),
         "prompt_tps_p50": s.get("prompt_tps_p50"),
         "decode_tps_p50": s.get("decode_tps_p50"),
         "total_tokens": s.get("total_tokens"),
+        "cached_prompt_tokens": s.get("cached_prompt_tokens"),
+        "reasoning_tokens": s.get("reasoning_tokens"),
         "n_ctx": rec.server.get("n_ctx_per_slot"),
         "note": s.get("note") or s.get("aborted"),
-        "build": f"{rec.provenance.llama_cpp_checkout or rec.provenance.llama_cpp_pinned or '?'}"
-        f"/{rec.provenance.cuda_arch or '?'}",
+        "build": build,
         "config_hash": rec.config_hash,
         "run_dir": None,
     }

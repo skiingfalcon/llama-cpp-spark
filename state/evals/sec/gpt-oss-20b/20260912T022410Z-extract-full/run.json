@@ -1,0 +1,123 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "gpt-oss-20b",
+  "started": "2026-09-12T02:24:10+00:00",
+  "finished": "2026-09-12T02:38:00+00:00",
+  "provenance": {
+    "timestamp": "2026-09-12T02:24:10+00:00",
+    "hostname": "spark-780e",
+    "machine": "aarch64",
+    "spark_llm_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": "82d6bb284d1f",
+    "cuda_arch": null,
+    "binary_version": null,
+    "gpu": {
+      "name": "NVIDIA GB10",
+      "driver_version": "580.173.02",
+      "compute_cap": "12.1",
+      "memory.total": "[N/A]",
+      "memory.used": "[N/A]",
+      "clocks.sm": "2405",
+      "clocks.mem": "[N/A]",
+      "temperature.gpu": "51",
+      "power.draw": "11.60"
+    }
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "total_slots": 4,
+    "model_path": "/opt/models/gpt-oss-20b-MXFP4.gguf",
+    "chat_template_sha": "b2215de6da8b",
+    "build_info": "b869-82d6bb284"
+  },
+  "runtime": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 0,
+    "n_parallel": null,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": "/opt/models/gpt-oss-20b-MXFP4.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 512
+  },
+  "task_config": {
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      "Revenues",
+      "NetIncomeLoss",
+      "OperatingIncomeLoss",
+      "EarningsPerShareDiluted",
+      "NetCashProvidedByUsedInOperatingActivities",
+      "Assets",
+      "Liabilities",
+      "StockholdersEquity",
+      "CashAndCashEquivalentsAtCarryingValue",
+      "LongTermDebtNoncurrent",
+      "CommonStockSharesOutstanding"
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "d3bcf817b091",
+  "tools": {},
+  "summary": {
+    "n": 120,
+    "scored": 103,
+    "correct": 79,
+    "score": 0.7669902912621359,
+    "skipped": 17,
+    "errors": 0,
+    "off_by_scale": 2,
+    "ttft_p50_s": 3.7448958160002803,
+    "ttft_p95_s": 33.17215078639982,
+    "prompt_tps_p50": 604.2895539080398,
+    "decode_tps_p50": 47.382205225482544,
+    "total_tokens": 8789554,
+    "by_form": {
+      "10-K": {
+        "n": 103,
+        "correct": 79
+      }
+    }
+  },
+  "n_results": 120
+}

@@ -201,6 +201,40 @@ fit the served context are skipped with the reason recorded, so an 8k-ctx model 
 "chunked only" instead of failing silently. Companies, tags, chunk size and tolerances live in
 [`evals.toml`](evals.toml); prompts live in `evals/prompts/`.
 
+#### Compare with an OpenAI frontier model
+
+The OpenAI path reuses the exact fetched filings, prompts, numeric ground truth, tolerance,
+and report format. The API key is read only from the environment and is never written to a
+run artifact. Replace the model ID and context limit with values supported by your account:
+
+```bash
+export OPENAI_API_KEY="..."
+
+# Cheap smoke test first: one extraction question.
+uv run spark-llm eval sec run <OPENAI_MODEL> \
+  --provider openai --context-window 128000 \
+  --task extract-full --forms 10-K --limit 1
+
+# Full pinned 10-K set.
+uv run spark-llm eval sec run <OPENAI_MODEL> \
+  --provider openai --context-window 128000 \
+  --task extract-full --forms 10-K
+
+# Shows the latest local and OpenAI runs together.
+uv run spark-llm eval report --suite sec
+```
+
+`SPARK_LLM_OPENAI_CONTEXT_WINDOW` changes the default context budget, and `OPENAI_BASE_URL`
+overrides `https://api.openai.com/v1`. OpenAI runs are named `openai:<model>` in reports.
+They record score, skips, TTFT, end-to-end latency, input/output token usage, cached input
+tokens, and reasoning tokens when the API returns them. External latency includes network
+and provider queueing; local llama.cpp prompt throughput and remote API throughput are not
+hardware-equivalent measurements. Context budgeting uses each model's own tokenizer, so
+token counts—and therefore the set of oversized filings skipped—can differ; compare scores
+alongside `n` and `skipped`. Frontier reasoning models do not consistently support
+fixed temperature or seed, so the OpenAI path records and uses provider decoding defaults.
+Use `--limit 1` before a full run to validate model access, context size, and likely cost.
+
 Filing work needs context: a 10-K is roughly 50k–150k tokens. Raise `ctx_size` in
 `models.toml` (and consider `cache_type_k`/`cache_type_v = "q8_0"`, `n_parallel`) for the
 models you want on the full-document path. llama-server splits `--ctx-size` across

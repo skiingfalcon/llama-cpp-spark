@@ -7,7 +7,15 @@ from pathlib import Path
 from spark_llm.config import Settings
 from spark_llm.evals.config import load_eval_config
 from spark_llm.evals.report import build_report, latest_runs
-from spark_llm.evals.runs import RunWriter, config_hash, list_runs, load_results, load_run
+from spark_llm.evals.runs import (
+    RunWriter,
+    config_hash,
+    list_runs,
+    load_results,
+    load_run,
+    path_safe,
+)
+from spark_llm.evals.sec.run import summarise
 from spark_llm.provenance import Provenance
 
 
@@ -24,6 +32,32 @@ def _prov() -> Provenance:
         llama_cpp_checkout="82d6bb284d1f",
         cuda_arch="121a-real",
     )
+
+
+def test_path_safe_strips_windows_illegal_chars() -> None:
+    assert path_safe("openai:gpt-5.6-terra") == "openai_gpt-5.6-terra"
+    assert path_safe(r'a\b/c*?"<>|d') == "a_b_c______d"
+    assert path_safe("gpt-oss-20b") == "gpt-oss-20b"
+
+
+def test_run_writer_sanitizes_model_directory(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    w = RunWriter(
+        settings,
+        "sec",
+        "extract-full",
+        "openai:gpt-5.6-terra",
+        provenance=_prov(),
+        server={"provider": "openai"},
+    )
+    assert ":" not in str(w.dir)
+    assert w.dir.name.startswith("20")  # timestamp-task
+    assert w.dir.parent.name == "openai_gpt-5.6-terra"
+    w.write({"id": "a", "correct": True})
+    rec = w.finish({"n": 1, "score": 1.0})
+    assert rec.model == "openai:gpt-5.6-terra"  # display name unchanged
+    assert load_run(w.dir).model == "openai:gpt-5.6-terra"
+    assert list_runs(settings, "sec") == [w.dir]
 
 
 def test_run_writer_roundtrip(tmp_path: Path) -> None:
@@ -54,6 +88,35 @@ def test_config_hash_is_stable_and_sensitive() -> None:
     a = config_hash("t", {"x": 1}, {"y": [1, 2]})
     assert a == config_hash("t", {"x": 1}, {"y": [1, 2]})
     assert a != config_hash("t", {"x": 2}, {"y": [1, 2]})
+
+
+def test_sec_summary_includes_latency_and_openai_usage_details() -> None:
+    summary = summarise(
+        [
+            {
+                "correct": True,
+                "skipped": False,
+                "ttft_s": 1.0,
+                "total_s": 3.0,
+                "prompt_tokens": 100,
+                "completion_tokens": 10,
+                "cached_prompt_tokens": 80,
+                "reasoning_tokens": 5,
+            },
+            {
+                "correct": False,
+                "skipped": False,
+                "ttft_s": 2.0,
+                "total_s": 5.0,
+                "prompt_tokens": 200,
+                "completion_tokens": 20,
+            },
+        ]
+    )
+    assert summary["score"] == 0.5
+    assert summary["ttft_p50_s"] == 1.5 and summary["total_p50_s"] == 4.0
+    assert summary["total_tokens"] == 330
+    assert summary["cached_prompt_tokens"] == 80 and summary["reasoning_tokens"] == 5
 
 
 def test_report_picks_latest_per_model_and_flags_config_drift(tmp_path: Path) -> None:

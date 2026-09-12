@@ -21,8 +21,9 @@ models/
 evals/data/
 evals/tools/
 
-# Runtime state (PIDs, llama-server logs)
-state/
+# Runtime state (PIDs, llama-server logs); eval artifacts are committed
+state/*
+!state/evals/
 .state/
 *.pid
 .env

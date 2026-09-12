@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,13 @@ from pydantic import BaseModel, Field
 
 from spark_llm.config import Settings
 from spark_llm.provenance import Provenance, collect
+
+_UNSAFE = re.compile(r'[:\\/*?"<>|]')
+
+
+def path_safe(name: str) -> str:
+    """Model names such as 'openai:gpt-5.6-terra' must not reach the filesystem verbatim."""
+    return _UNSAFE.sub("_", name)
 
 
 def config_hash(*parts: Any) -> str:
@@ -59,7 +67,7 @@ class RunWriter:
         provenance: Provenance | None = None,
     ) -> None:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        self.dir = evals_root(settings) / suite / model / f"{stamp}-{task}"
+        self.dir = evals_root(settings) / suite / path_safe(model) / f"{stamp}-{task}"
         self.dir.mkdir(parents=True, exist_ok=True)
         prov = provenance or collect(settings, with_gpu=True)
         self.record = RunRecord(

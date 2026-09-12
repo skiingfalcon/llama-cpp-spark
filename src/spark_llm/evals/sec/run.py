@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,7 +14,7 @@ from rich.console import Console
 
 from spark_llm.config import Settings
 from spark_llm.evals.config import EvalConfig, load_prompt
-from spark_llm.evals.endpoint import ChatResult, Endpoint, percentile, run_parallel
+from spark_llm.evals.endpoint import ChatResult, Endpoint, OpenAIEndpoint, percentile, run_parallel
 from spark_llm.evals.runs import RunRecord, RunWriter
 from spark_llm.evals.sec.fetch import Filing, load_manifest
 from spark_llm.evals.sec.parse import MDNA, chunk_tokens, section_text, words
@@ -24,6 +25,7 @@ from spark_llm.evals.sec.questions import (
     questions_for_filing,
     score_numeric,
 )
+from spark_llm.provenance import collect
 from spark_llm.registry import Registry, load_registry
 from spark_llm.server import merge_runtime
 
@@ -43,6 +45,8 @@ class SecRunOptions:
     tickers: list[str] = field(default_factory=list)
     forms: list[str] = field(default_factory=list)
     judge_port: int | None = None
+    provider: str = "local"
+    context_window: int | None = None
 
 
 def endpoint_for(
@@ -54,6 +58,23 @@ def endpoint_for(
     if not ep.healthy():
         raise RuntimeError(
             f"{model} is not serving on {host}:{listen}; run: spark-llm serve {model}"
+        )
+    return ep
+
+
+def openai_endpoint_for(settings: Settings, model: str, context_window: int | None) -> Endpoint:
+    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key or ""
+    base_url = os.environ.get("OPENAI_BASE_URL", settings.openai_base_url)
+    ep = OpenAIEndpoint(
+        api_key,
+        model,
+        base_url=base_url,
+        context_window=context_window or settings.openai_context_window,
+    )
+    if not ep.healthy():
+        ep.close()
+        raise RuntimeError(
+            "OpenAI API preflight failed; check OPENAI_API_KEY, OPENAI_BASE_URL, and model access"
         )
     return ep
 
@@ -133,9 +154,12 @@ def _timing(r: ChatResult) -> dict[str, Any]:
 def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
     scored = [r for r in results if not r.get("skipped") and r.get("correct") is not None]
     ttft = [r["ttft_s"] for r in results if r.get("ttft_s") is not None]
+    total = [r["total_s"] for r in results if r.get("total_s") is not None]
     ptps = [r["prompt_tps"] for r in results if r.get("prompt_tps")]
     dtps = [r["decode_tps"] for r in results if r.get("decode_tps")]
     tokens = sum((r.get("prompt_tokens") or 0) + (r.get("completion_tokens") or 0) for r in results)
+    cached_tokens = sum(r.get("cached_prompt_tokens") or 0 for r in results)
+    reasoning_tokens = sum(r.get("reasoning_tokens") or 0 for r in results)
     by_form: dict[str, dict[str, int]] = {}
     for r in scored:
         b = by_form.setdefault(r.get("form", "?"), {"n": 0, "correct": 0})
@@ -151,9 +175,13 @@ def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
         "off_by_scale": sum(int(bool(r.get("off_by_scale"))) for r in results),
         "ttft_p50_s": percentile(ttft, 0.5),
         "ttft_p95_s": percentile(ttft, 0.95),
+        "total_p50_s": percentile(total, 0.5),
+        "total_p95_s": percentile(total, 0.95),
         "prompt_tps_p50": percentile(ptps, 0.5),
         "decode_tps_p50": percentile(dtps, 0.5),
         "total_tokens": tokens,
+        "cached_prompt_tokens": cached_tokens,
+        "reasoning_tokens": reasoning_tokens,
         "by_form": by_form,
     }
 
@@ -460,8 +488,30 @@ def run_summary(
 def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOptions) -> RunRecord:
     if opts.task not in TASKS:
         raise ValueError(f"unknown task {opts.task!r}; choose from {', '.join(TASKS)}")
+    if opts.provider not in {"local", "openai"}:
+        raise ValueError("provider must be 'local' or 'openai'")
     registry = load_registry(settings=settings)
-    ep = endpoint_for(settings, registry, model, opts.host, opts.port)
+    if opts.provider == "openai":
+        ep = openai_endpoint_for(settings, model, opts.context_window)
+        run_model = f"openai:{model}"
+        runtime = {
+            "provider": "openai",
+            "model": model,
+            "context_window": ep.n_ctx(),
+        }
+        quality = {
+            **cfg.quality.model_dump(),
+            "temperature": None,
+            "seed": None,
+            "note": "provider defaults; frontier reasoning models reject fixed temperature/seed",
+        }
+        provenance = collect(settings, with_gpu=False)
+    else:
+        ep = endpoint_for(settings, registry, model, opts.host, opts.port)
+        run_model = model
+        runtime = merge_runtime(registry.get(model), registry.defaults, settings).as_dict()
+        quality = cfg.quality.model_dump()
+        provenance = None
     manifest = load_manifest(settings)
     filings = _filter(manifest.filings, opts)
     judge: Judge | None = None
@@ -472,15 +522,14 @@ def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOp
         except (RuntimeError, KeyError) as exc:
             console.print(f"[yellow]judge unavailable[/yellow] ({exc}); free-text items unscored")
 
-    rt = merge_runtime(registry.get(model), registry.defaults, settings)
     writer = RunWriter(
         settings,
         "sec",
         opts.task,
-        model,
+        run_model,
         server=ep.server_summary(),
-        runtime=rt.as_dict(),
-        quality=cfg.quality.model_dump(),
+        runtime=runtime,
+        quality=quality,
         task_config={
             "chunk_tokens": cfg.sec.chunk_tokens,
             "top_k": cfg.sec.top_k,
@@ -493,6 +542,7 @@ def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOp
             "limit": opts.limit,
             "filters": {"tickers": opts.tickers, "forms": opts.forms},
         },
+        provenance=provenance,
     )
     if opts.task == "extract-full":
         results = run_extract(ep, cfg, writer, filings, manifest.facts_paths, opts, chunked=False)

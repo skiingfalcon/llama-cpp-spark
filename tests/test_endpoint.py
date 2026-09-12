@@ -6,7 +6,7 @@ import json
 
 import httpx
 
-from spark_llm.evals.endpoint import Endpoint, percentile, run_parallel
+from spark_llm.evals.endpoint import Endpoint, OpenAIEndpoint, percentile, run_parallel
 
 
 def _sse(chunks: list[dict]) -> bytes:
@@ -154,6 +154,57 @@ def test_props_tokenize_detokenize() -> None:
     assert ep.server_summary()["total_slots"] == 2
     assert ep.count_tokens("abc") == 3
     assert ep.detokenize([1, 2, 3]) == "abc"
+
+
+def test_openai_endpoint_uses_portable_request_and_tracks_usage() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer test-key"
+        if request.url.path == "/v1/models/frontier-test":
+            return httpx.Response(200, json={"data": []})
+        assert request.url.path == "/v1/chat/completions"
+        body = json.loads(request.content)
+        assert body["model"] == "frontier-test"
+        assert body["max_completion_tokens"] == 32
+        assert "temperature" not in body and "seed" not in body
+        assert "cache_prompt" not in body and "timings_per_token" not in body
+        return httpx.Response(
+            200,
+            content=_sse(
+                [
+                    {"choices": [{"delta": {"content": "42"}, "finish_reason": "stop"}]},
+                    {
+                        "choices": [],
+                        "usage": {
+                            "prompt_tokens": 100,
+                            "completion_tokens": 7,
+                            "prompt_tokens_details": {"cached_tokens": 80},
+                            "completion_tokens_details": {"reasoning_tokens": 5},
+                        },
+                    },
+                ]
+            ),
+        )
+
+    ep = OpenAIEndpoint(
+        "test-key",
+        "frontier-test",
+        context_window=200000,
+        transport=httpx.MockTransport(handler),
+    )
+    assert ep.healthy()
+    assert ep.n_ctx() == 200000
+    assert ep.server_summary()["provider"] == "openai"
+    assert ep.detokenize(ep.tokenize("annual report")) == "annual report"
+    r = ep.chat(
+        [{"role": "user", "content": "q"}],
+        temperature=0.0,
+        seed=42,
+        max_tokens=32,
+    )
+    assert r.ok and r.content == "42"
+    assert r.prompt_tokens == 100 and r.completion_tokens == 7
+    assert r.cached_prompt_tokens == 80 and r.reasoning_tokens == 5
+    assert r.decode_tps is None
 
 
 def test_helpers() -> None:

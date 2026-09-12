@@ -63,7 +63,9 @@ def sec_fetch(
 
 @sec_app.command("run")
 def sec_run(
-    model: str = typer.Argument(..., help="Registered model name (must be serving)"),
+    model: str = typer.Argument(
+        ..., help="Registered local model, or OpenAI model ID with --provider openai"
+    ),
     task: str = typer.Option("extract-full", "--task", help=f"One of {', '.join(TASKS)} or 'all'"),
     limit: int | None = typer.Option(None, "--limit", help="Max items"),
     parallel: int = typer.Option(1, "--parallel", help="Concurrent requests"),
@@ -72,6 +74,12 @@ def sec_run(
     host: str | None = HOST_OPT,
     port: int | None = PORT_OPT,
     judge_port: int | None = typer.Option(None, "--judge-port"),
+    provider: str = typer.Option("local", "--provider", help="local or openai"),
+    context_window: int | None = typer.Option(
+        None,
+        "--context-window",
+        help="OpenAI model context limit (default SPARK_LLM_OPENAI_CONTEXT_WINDOW)",
+    ),
 ) -> None:
     """Run a SEC task against the served model; results under state/evals/sec/."""
     settings = get_settings()
@@ -87,6 +95,8 @@ def sec_run(
             tickers=_csv(tickers),
             forms=_csv(forms),
             judge_port=judge_port,
+            provider=provider,
+            context_window=context_window,
         )
         try:
             rec = run_sec_task(settings, cfg, model, opts)
@@ -95,7 +105,7 @@ def sec_run(
             raise typer.Exit(1) from exc
         s = rec.summary
         console.print(
-            f"[bold]{model}[/bold] {t}: score={s.get('score')} n={s.get('n')} "
+            f"[bold]{rec.model}[/bold] {t}: score={s.get('score')} n={s.get('n')} "
             f"skipped={s.get('skipped')} ttft_p50={s.get('ttft_p50_s')}"
         )
 

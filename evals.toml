@@ -23,15 +23,15 @@ max_tokens = 256
 companies = [
   { ticker = "AAPL", cik = 320193 },
   { ticker = "MSFT", cik = 789019 },
-  { ticker = "JPM",  cik = 19617 },
+  { ticker = "GS",   cik = 886982 },
   { ticker = "XOM",  cik = 34088 },
-  { ticker = "JNJ",  cik = 200406 },
+  { ticker = "PLTR", cik = 1321655 },
   { ticker = "WMT",  cik = 104169 },
   { ticker = "PG",   cik = 80424 },
   { ticker = "CAT",  cik = 18230 },
   { ticker = "NEE",  cik = 753308 },
   { ticker = "HD",   cik = 354950 },
-  { ticker = "PLD",  cik = 1045609 },
+  { ticker = "INTU", cik = 896878 },
   { ticker = "STWD", cik = 1465128 },
 ]
 forms = { "10-K" = 1, "10-Q" = 3 }
