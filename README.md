@@ -196,10 +196,13 @@ uv run spark-llm eval report --suite sec
 
 Ground truth for `extract-*` comes from EDGAR's XBRL company facts (revenue, net income, EPS,
 assets, cash flow, …), matched with 0.5 % tolerance; answers that are right except for a
-thousands/millions scale error are counted separately (`off_by_scale`). Filings that do not
-fit the served context are skipped with the reason recorded, so an 8k-ctx model shows up as
-"chunked only" instead of failing silently. Companies, tags, chunk size and tolerances live in
-[`evals.toml`](evals.toml); prompts live in `evals/prompts/`.
+thousands/millions scale error are counted separately (`off_by_scale`). In `extract-full`,
+a filing that does not fit the served context degrades per filing rather than being skipped:
+the financial-statements Item (8 for a 10-K) goes in if it fits, else the BM25 top-k chunks.
+Each result records `mode` (`full` / `section` / `chunked`) and a `fallback` flag, and the
+run summary breaks accuracy down `by_mode`, so partial-context answers (GS and STWD 10-Ks at
+131K) stay distinguishable from full-document ones. Companies, tags, chunk size and tolerances
+live in [`evals.toml`](evals.toml); prompts live in `evals/prompts/`.
 
 #### Compare with an OpenAI frontier model
 

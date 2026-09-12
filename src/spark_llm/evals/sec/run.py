@@ -17,7 +17,13 @@ from spark_llm.evals.config import EvalConfig, load_prompt
 from spark_llm.evals.endpoint import ChatResult, Endpoint, OpenAIEndpoint, percentile, run_parallel
 from spark_llm.evals.runs import RunRecord, RunWriter
 from spark_llm.evals.sec.fetch import Filing, load_manifest
-from spark_llm.evals.sec.parse import MDNA, chunk_tokens, section_text, words
+from spark_llm.evals.sec.parse import (
+    FINANCIAL_STATEMENTS,
+    MDNA,
+    chunk_tokens,
+    section_text,
+    words,
+)
 from spark_llm.evals.sec.questions import (
     Question,
     answer_has_single_number,
@@ -128,6 +134,7 @@ class DocCache:
         self.ep = ep
         self._text: dict[str, str] = {}
         self._ids: dict[str, list[int]] = {}
+        self._sections: dict[tuple[str, str], tuple[str, list[int]] | None] = {}
 
     def text(self, f: Filing) -> str:
         if f.key not in self._text:
@@ -138,6 +145,14 @@ class DocCache:
         if f.key not in self._ids:
             self._ids[f.key] = self.ep.tokenize(self.text(f))
         return self._ids[f.key]
+
+    def section(self, f: Filing, which: dict[str, str]) -> tuple[str, list[int]] | None:
+        """Text and token ids of one Item section (e.g. Item 8), or None if not found."""
+        key = (f.key, which.get(f.form, "?"))
+        if key not in self._sections:
+            text = section_text(self.text(f), f.form, which)
+            self._sections[key] = (text, self.ep.tokenize(text)) if text else None
+        return self._sections[key]
 
 
 def _filter(filings: list[Filing], opts: SecRunOptions) -> list[Filing]:
@@ -163,10 +178,15 @@ def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
     cached_tokens = sum(r.get("cached_prompt_tokens") or 0 for r in results)
     reasoning_tokens = sum(r.get("reasoning_tokens") or 0 for r in results)
     by_form: dict[str, dict[str, int]] = {}
+    by_mode: dict[str, dict[str, int]] = {}
     for r in scored:
         b = by_form.setdefault(r.get("form", "?"), {"n": 0, "correct": 0})
         b["n"] += 1
         b["correct"] += int(bool(r["correct"]))
+        if r.get("mode"):
+            m = by_mode.setdefault(r["mode"], {"n": 0, "correct": 0})
+            m["n"] += 1
+            m["correct"] += int(bool(r["correct"]))
     return {
         "n": len(results),
         "scored": len(scored),
@@ -187,6 +207,9 @@ def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
         "cached_prompt_tokens": cached_tokens,
         "reasoning_tokens": reasoning_tokens,
         "by_form": by_form,
+        # full / section / chunked: how much of the filing the model saw (see ContextBuilder)
+        "by_mode": by_mode,
+        "fallback": sum(int(bool(r.get("fallback"))) for r in results),
     }
 
 
@@ -232,6 +255,73 @@ def _budget(n_ctx: int | None, cfg: EvalConfig, question_tokens: int) -> int | N
     return min(cap, n_ctx) - cfg.quality.max_tokens - PROMPT_OVERHEAD_TOKENS - question_tokens
 
 
+# -- context selection ---------------------------------------------------------------------------
+
+
+@dataclass
+class Context:
+    text: str | None
+    tokens: int  # tokens placed in context (0 when skipped)
+    mode: str  # full | section | chunked
+    fallback: bool = False  # True when the filing did not fit and a smaller view was used
+    reason: str | None = None  # set when text is None (skipped)
+
+
+class ContextBuilder:
+    """Choose what part of a filing to show the model for one question.
+
+    Full-document mode degrades per filing instead of skipping: whole filing if it fits, else
+    the financial-statements Item (8 for 10-K, Part I Item 1 for 10-Q) if that fits, else the
+    BM25 top-k chunks. The chosen ``mode`` and a ``fallback`` flag are recorded on every result
+    so partial-context answers stay distinguishable from full-document ones.
+    """
+
+    def __init__(self, ep: Endpoint, cfg: EvalConfig, docs: DocCache | None = None) -> None:
+        self.ep = ep
+        self.cfg = cfg
+        self.docs = docs or DocCache(ep)
+        self.n_ctx = ep.n_ctx()
+        self._bm25: dict[str, tuple[BM25Okapi, list[str]]] = {}
+
+    def build(self, f: Filing, q: Question, budget: int | None, *, chunked: bool) -> Context:
+        ids = self.docs.ids(f)
+        if chunked:
+            return self._chunked(f, q, budget, ids, fallback=False)
+        if budget is None or len(ids) <= budget:
+            return Context(self.docs.text(f), len(ids), "full")
+        sec = self.docs.section(f, FINANCIAL_STATEMENTS)
+        if sec is not None and len(sec[1]) <= budget:
+            return Context(sec[0], len(sec[1]), "section", fallback=True)
+        ctx = self._chunked(f, q, budget, ids, fallback=True)
+        if ctx.text is None:
+            ctx.reason = (
+                f"filing is {len(ids)} tokens; budget {budget} at ctx {self.n_ctx}; {ctx.reason}"
+            )
+        return ctx
+
+    def _chunked(
+        self, f: Filing, q: Question, budget: int | None, ids: list[int], *, fallback: bool
+    ) -> Context:
+        size = self.cfg.sec.chunk_tokens
+        if f.key not in self._bm25:
+            chunks = [self.ep.detokenize(c) for c in chunk_tokens(ids, size)]
+            self._bm25[f.key] = (BM25Okapi([words(c) for c in chunks]), chunks)
+        bm25, chunks = self._bm25[f.key]
+        scores = bm25.get_scores(words(f"{q.text} {q.label} {q.tag}"))
+        ranked = sorted(range(len(chunks)), key=lambda i: -scores[i])[: self.cfg.sec.top_k]
+        keep: list[int] = []
+        used = 0
+        for i in ranked:
+            if budget is not None and used + size > budget:
+                continue
+            keep.append(i)
+            used += size
+        if not keep:
+            return Context(None, 0, "chunked", fallback, f"no chunk fits budget {budget}")
+        text = "\n\n[...]\n\n".join(chunks[i] for i in sorted(keep))
+        return Context(text, used, "chunked", fallback)
+
+
 # -- tasks ------------------------------------------------------------------------------------
 
 
@@ -270,41 +360,10 @@ def run_extract(
     items = _extract_items(filings, facts_paths, cfg)
     if opts.limit:
         items = items[: opts.limit]
-    docs = DocCache(ep)
-    n_ctx = ep.n_ctx()
+    builder = ContextBuilder(ep, cfg)
+    docs = builder.docs
+    n_ctx = builder.n_ctx
     seen_filings: set[str] = set()
-    bm25_cache: dict[str, tuple[BM25Okapi, list[str]]] = {}
-
-    def context_for(
-        f: Filing, q: Question, budget: int | None
-    ) -> tuple[str | None, str | None, int]:
-        ids = docs.ids(f)
-        if not chunked:
-            if budget is not None and len(ids) > budget:
-                return (
-                    None,
-                    f"filing is {len(ids)} tokens; budget {budget} at ctx {n_ctx}",
-                    len(ids),
-                )
-            return docs.text(f), None, len(ids)
-        if f.key not in bm25_cache:
-            chunks = [ep.detokenize(c) for c in chunk_tokens(ids, cfg.sec.chunk_tokens)]
-            bm25_cache[f.key] = (BM25Okapi([words(c) for c in chunks]), chunks)
-        bm25, chunks = bm25_cache[f.key]
-        scores = bm25.get_scores(words(f"{q.text} {q.label} {q.tag}"))
-        ranked = sorted(range(len(chunks)), key=lambda i: -scores[i])[: cfg.sec.top_k]
-        keep: list[int] = []
-        used = 0
-        for i in ranked:
-            n = cfg.sec.chunk_tokens
-            if budget is not None and used + n > budget:
-                continue
-            keep.append(i)
-            used += n
-        if not keep:
-            return None, f"no chunk fits budget {budget}", len(ids)
-        ctx = "\n\n[...]\n\n".join(chunks[i] for i in sorted(keep))
-        return ctx, None, used
 
     def one(item: tuple[Filing, Question]) -> dict[str, Any]:
         f, q = item
@@ -323,21 +382,22 @@ def run_extract(
             "alternates": q.alternates,
             "question": q.text,
             "warm": warm,
-            "mode": "chunked" if chunked else "full",
         }
         budget = _budget(n_ctx, cfg, len(words(q.text)) * 2)
-        context, reason, ctx_tokens = context_for(f, q, budget)
+        ctx = builder.build(f, q, budget, chunked=chunked)
+        base["mode"] = ctx.mode
+        base["fallback"] = ctx.fallback
         base["doc_tokens"] = len(docs.ids(f))
-        base["context_tokens"] = ctx_tokens
-        if context is None:
-            rec = {**base, "skipped": True, "reason": reason, "correct": None}
+        base["context_tokens"] = ctx.tokens
+        if ctx.text is None:
+            rec = {**base, "skipped": True, "reason": ctx.reason, "correct": None}
             writer.write(rec)
             return rec
         user = user_tpl.format(
             form=f.form,
             company=f.company,
             period_end=f.report_date,
-            document=context,
+            document=ctx.text,
             question=q.text,
             format_hint=q.format_hint,
         )

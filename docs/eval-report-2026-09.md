@@ -135,7 +135,8 @@ treating 96.4% as a final number.
 
 **Cons**
 
-- Hard 131K context ceiling; GS / STWD (242K tokens) are skipped unless you chunk.
+- Hard 131K context ceiling; GS / STWD (176K–242K tokens) are answered from Item 8 or
+  retrieved chunks rather than the whole filing (recorded as `mode != full`).
 - 120b weights alone are ~63 GB resident; KV cache and concurrency compete for the
   Spark's 121 GB unified memory.
 - Slower TTFT than the API (3.7–6.1 s p50 vs 1.2 s).
@@ -256,6 +257,9 @@ the wall.
    reproduces the 92 / 86 / 74 of 96 numbers above.
 5. OpenAI client honours `Retry-After`, retries 8× with a 60 s cap.
 6. `models.toml` pins 120b at 131,072 context.
+7. `extract-full` no longer skips GS / STWD: a filing over budget falls back to its Item 8
+   (financial statements), then to BM25 chunks, with `mode` / `fallback` recorded per item and
+   a `by_mode` accuracy breakdown in the summary. The paired set with Terra grows to ~110.
 
 Re-scoring the old answers against the fixed ground truth (no model re-run) turns WMT, NEE and
 HD green for all three models; XOM depends on the new label and needs a re-run. With
