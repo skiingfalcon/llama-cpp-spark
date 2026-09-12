@@ -1,4 +1,4 @@
-"""`spark-llm eval …` sub-commands."""
+"""`local-llm eval …` sub-commands."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def _ints(raw: str | None) -> list[int]:
 
 
 HOST_OPT = typer.Option(
-    None, "--host", help="Server host (default SPARK_LLM_EVAL_HOST / 127.0.0.1)"
+    None, "--host", help="Server host (default LOCAL_LLM_EVAL_HOST / 127.0.0.1)"
 )
 PORT_OPT = typer.Option(None, "--port", help="Override the model's registered port")
 
@@ -78,7 +78,7 @@ def sec_run(
     context_window: int | None = typer.Option(
         None,
         "--context-window",
-        help="OpenAI model context limit (default SPARK_LLM_OPENAI_CONTEXT_WINDOW)",
+        help="OpenAI model context limit (default LOCAL_LLM_OPENAI_CONTEXT_WINDOW)",
     ),
     max_tokens: int | None = typer.Option(
         None, "--max-tokens", help="Completion budget incl. hidden reasoning (evals.toml default)"

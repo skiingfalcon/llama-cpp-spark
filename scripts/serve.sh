@@ -9,4 +9,4 @@ source "${SCRIPT_DIR}/env.sh"
 MODEL="${1:-gpt-oss-20b}"
 shift || true
 cd "${REPO_ROOT}"
-exec uv run spark-llm serve "${MODEL}" "$@"
+exec uv run local-llm serve "${MODEL}" "$@"

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import signal
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -13,8 +11,9 @@ from pathlib import Path
 import httpx
 from rich.console import Console
 
-from spark_llm.config import Settings, get_settings, repo_root
+from spark_llm.config import Settings, get_settings
 from spark_llm.download import resolve_weights
+from spark_llm.platforms import current as current_platform
 from spark_llm.registry import Defaults, ModelKind, ModelSpec, Registry, load_registry
 
 console = Console(stderr=True)
@@ -74,19 +73,13 @@ def kind_flags(kind: ModelKind) -> list[str]:
 
 
 def binary_path(settings: Settings) -> Path:
-    return settings.vendor_dir / "build" / "bin" / "llama-server"
+    """llama-server for the current platform (CUDA source build, or a prebuilt zip on Halo)."""
+    return current_platform().binary_path(settings)
 
 
 def runtime_env(settings: Settings) -> dict[str, str]:
-    env = os.environ.copy()
-    bin_dir = str(settings.vendor_dir / "build" / "bin")
-    compat = "/usr/local/cuda-13/compat"
-    if not Path(compat).is_dir():
-        compat = "/usr/local/cuda/compat"
-    existing = env.get("LD_LIBRARY_PATH", "")
-    env["LD_LIBRARY_PATH"] = f"{bin_dir}:{compat}:{existing}".rstrip(":")
-    env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-    return env
+    """Process environment for llama-server / llama-bench (library search paths per platform)."""
+    return current_platform().runtime_env(settings)
 
 
 def _first(*values):  # type: ignore[no-untyped-def]
@@ -304,7 +297,7 @@ def start_server(
         env=env,
         stdout=log_fh,
         stderr=subprocess.STDOUT,
-        start_new_session=True,
+        **current_platform().popen_kwargs(),  # setsid on Linux, detached process group on Windows
     )
     state = load_state(settings)
     state[name] = {
@@ -333,10 +326,9 @@ def stop_servers(names: list[str] | None = None, settings: Settings | None = Non
             console.print(f"[yellow]not tracked[/yellow] {name}")
             continue
         pid = int(info["pid"])
-        try:
-            os.kill(pid, signal.SIGTERM)
+        if current_platform().terminate(pid):
             console.print(f"[green]stopped[/green] {name} (pid {pid})")
-        except ProcessLookupError:
+        else:
             console.print(f"[yellow]already dead[/yellow] {name} (pid {pid})")
         state.pop(name, None)
     save_state(settings, state)
@@ -371,4 +363,7 @@ def ephemeral_spec_for_hf(hf: str, port: int, settings: Settings) -> ModelSpec:
 
 
 def project_build_script() -> Path:
-    return repo_root() / "scripts" / "build.sh"
+    """The Spark's CMake build script; Halo installs prebuilt zips instead (platform.build)."""
+    from spark_llm.platforms.spark.platform import SparkPlatform
+
+    return SparkPlatform().build_script()

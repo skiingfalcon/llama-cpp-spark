@@ -17,6 +17,7 @@ from spark_llm.evals.runs import RunRecord, RunWriter
 from spark_llm.evals.sec.fetch import load_manifest
 from spark_llm.evals.sec.run import endpoint_for
 from spark_llm.gpu import gpu_memory_used_mib
+from spark_llm.platforms import current as current_platform
 from spark_llm.registry import load_registry
 from spark_llm.server import merge_runtime
 
@@ -58,6 +59,8 @@ def run_sec_perf(settings: Settings, cfg: EvalConfig, model: str, opts: PerfOpti
     n_ctx = ep.n_ctx()
     server = ep.server_summary()
     rt = merge_runtime(registry.get(model), registry.defaults, settings)
+    # "gpu_mem" = dedicated VRAM (Spark); "unified_mem" = whole UMA pool in use (Halo).
+    mem_key = current_platform().memory_metric
     writer = RunWriter(
         settings,
         "sec",
@@ -71,6 +74,7 @@ def run_sec_perf(settings: Settings, cfg: EvalConfig, model: str, opts: PerfOpti
             "concurrency": opts.concurrency,
             "concurrency_prompt_tokens": opts.concurrency_prompt_tokens,
             "source_filings": [f.key for f in filings[:3]],
+            "memory_metric": mem_key,
         },
     )
 
@@ -116,7 +120,9 @@ def run_sec_perf(settings: Settings, cfg: EvalConfig, model: str, opts: PerfOpti
             prompt(prefix, Q_WARM), temperature=0.0, max_tokens=opts.max_tokens, cache_prompt=True
         )
         for kind, r in (("cold", cold), ("warm", warm)):
-            rec = _record(kind, length, r, gpu_mem_before_mib=mem0, gpu_mem_after_mib=mem1)
+            rec = _record(
+                kind, length, r, **{f"{mem_key}_before_mib": mem0, f"{mem_key}_after_mib": mem1}
+            )
             writer.write(rec)
             results.append(rec)
         console.print(

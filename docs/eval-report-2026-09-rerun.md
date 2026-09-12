@@ -205,26 +205,30 @@ GS Item-8 questions, NEE Assets/Liabilities (subsidiary-level totals), HD NetInc
 
 ```bash
 cd ~/projects/llama-cpp-spark
-export SPARK_LLM_EDGAR_USER_AGENT="spark-llm you@example.com"
+export LOCAL_LLM_EDGAR_USER_AGENT="local-llm you@example.com"
 
-uv run spark-llm eval sec fetch                                   # corpus (once)
+uv run local-llm eval sec fetch                                   # corpus (once)
 
-uv run spark-llm serve gpt-oss-20b
-uv run spark-llm eval sec run gpt-oss-20b --task extract-full --forms 10-K
-uv run spark-llm stop
+uv run local-llm serve gpt-oss-20b
+uv run local-llm eval sec run gpt-oss-20b --task extract-full --forms 10-K
+uv run local-llm stop
 
-uv run spark-llm serve gpt-oss-120b                               # models.toml pins 131072
-uv run spark-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
-uv run spark-llm stop
+uv run local-llm serve gpt-oss-120b                               # models.toml pins 131072
+uv run local-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
+uv run local-llm stop
 
 # Frontier (OPENAI_API_KEY from .env; serial to respect rate limits)
-uv run spark-llm eval sec run gpt-5.6-terra \
+uv run local-llm eval sec run gpt-5.6-terra \
   --provider openai --task extract-full --forms 10-K --parallel 1
 
 # Cross-model table + gpt-oss-vs-Terra comparison (slices, by-tag, by-company,
 # per-item disagreements), written to state/evals/report-sec.md
-uv run spark-llm eval report --suite sec
+uv run local-llm eval report --suite sec
 ```
+
+To repeat this on the AMD Strix Halo box (Windows), follow the README section
+[Windows / AMD Strix Halo](../README.md#windows--amd-strix-halo); the eval commands are the
+same and the report adds a Hardware block comparing the two machines.
 
 ## Bottom line for the team
 

@@ -1,0 +1,4 @@
+# llama.cpp GitHub release tag used for prebuilt Windows zips (Halo box).
+# The Spark pin in LLAMA_CPP_VERSION (82d6bb284d1f, 2026-09-11 22:53 UTC) has no release tag of
+# its own (b10917 precedes it, b10918 was never published); b10919 is the nearest later tag.
+b10919

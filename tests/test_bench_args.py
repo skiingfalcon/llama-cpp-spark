@@ -95,7 +95,7 @@ def test_quant_only_spec_resolves_from_snapshot(settings: Settings) -> None:
 
 def test_quant_only_spec_missing_is_clear_error(settings: Settings) -> None:
     spec = ModelSpec(name="qwen3-8b", repo="unsloth/Qwen3-8B-GGUF", quant="Q4_K_M", port=8081)
-    with pytest.raises(FileNotFoundError, match="spark-llm download qwen3-8b"):
+    with pytest.raises(FileNotFoundError, match="local-llm download qwen3-8b"):
         bench_argv(spec, Defaults(), settings)
 
 

@@ -1,6 +1,6 @@
-# Evaluation suites for spark-llm. Data, not code: edit here, not in Python.
+# Evaluation suites for local-llm. Data, not code: edit here, not in Python.
 #
-# Every eval talks to a *running* llama-server started by `spark-llm serve`, so results
+# Every eval talks to a *running* llama-server started by `local-llm serve`, so results
 # reflect the served configuration (ctx, slots, sampling, chat template).
 
 [quality]
@@ -15,7 +15,7 @@ max_tokens = 4096
 # reasoning_effort = "low"
 
 [judge]
-# LLM judge for free-text answers. Must be served (spark-llm serve <model>) when a task needs it.
+# LLM judge for free-text answers. Must be served (local-llm serve <model>) when a task needs it.
 model = "gpt-oss-120b"
 max_tokens = 256
 

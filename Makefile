@@ -4,40 +4,40 @@ build:
 	./scripts/build.sh
 
 serve:
-	uv run spark-llm serve gpt-oss-20b
+	uv run local-llm serve gpt-oss-20b
 
 bench:
-	uv run spark-llm bench gpt-oss-20b
+	uv run local-llm bench gpt-oss-20b
 
-# Evals need a served model: `uv run spark-llm serve $(MODEL)` first.
+# Evals need a served model: `uv run local-llm serve $(MODEL)` first.
 MODEL ?= gpt-oss-20b
 eval-fetch:
-	uv run spark-llm eval sec fetch
+	uv run local-llm eval sec fetch
 
 eval-sec:
-	uv run spark-llm eval sec run $(MODEL) --task extract-full
-	uv run spark-llm eval sec run $(MODEL) --task extract-chunked
-	uv run spark-llm eval sec perf $(MODEL)
+	uv run local-llm eval sec run $(MODEL) --task extract-full
+	uv run local-llm eval sec run $(MODEL) --task extract-chunked
+	uv run local-llm eval sec perf $(MODEL)
 
 eval-swe:
-	uv run spark-llm eval swe check $(MODEL)
-	uv run spark-llm eval swe run $(MODEL) --tier 1
+	uv run local-llm eval swe check $(MODEL)
+	uv run local-llm eval swe run $(MODEL) --tier 1
 
 eval-report:
-	uv run spark-llm eval report --suite sec
-	uv run spark-llm eval report --suite swe
+	uv run local-llm eval report --suite sec
+	uv run local-llm eval report --suite swe
 
 download:
-	uv run spark-llm download gpt-oss-20b
+	uv run local-llm download gpt-oss-20b
 
 models:
-	uv run spark-llm models
+	uv run local-llm models
 
 doctor:
-	uv run spark-llm doctor
+	uv run local-llm doctor
 
 stop:
-	uv run spark-llm stop
+	uv run local-llm stop
 
 test:
 	uv run pytest -q

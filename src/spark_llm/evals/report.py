@@ -29,6 +29,7 @@ COLUMNS = [
     ("reasoning", "reasoning_tokens"),
     ("ctx", "n_ctx"),
     ("build", "build"),
+    ("platform", "platform"),
     ("note", "note"),
 ]
 
@@ -41,17 +42,37 @@ def _fmt(v: Any) -> str:
     return str(v)
 
 
+def platform_key(rec: RunRecord) -> tuple[str, str | None]:
+    """(platform, backend) a run was served from; API runs are platform-agnostic.
+
+    Runs recorded before provenance carried these fields were all Spark/CUDA.
+    """
+    if rec.server.get("provider"):
+        return ("api", None)
+    prov = rec.provenance
+    return (prov.platform or "spark", prov.backend or "cuda")
+
+
+def platform_label(rec: RunRecord) -> str:
+    plat, backend = platform_key(rec)
+    return plat if backend is None else f"{plat}/{backend}"
+
+
+def build_label(rec: RunRecord) -> str:
+    provider = rec.server.get("provider")
+    if provider:
+        return f"{provider}/api"
+    prov = rec.provenance
+    ident = prov.llama_cpp_release or prov.llama_cpp_checkout or prov.llama_cpp_pinned or "?"
+    return f"{ident}/{prov.cuda_arch or '?'}"
+
+
 def row_for(rec: RunRecord) -> dict[str, Any]:
     s = rec.summary
-    provider = rec.server.get("provider")
-    build = (
-        f"{provider}/api"
-        if provider
-        else f"{rec.provenance.llama_cpp_checkout or rec.provenance.llama_cpp_pinned or '?'}"
-        f"/{rec.provenance.cuda_arch or '?'}"
-    )
+    build = build_label(rec)
     return {
         "model": rec.model,
+        "platform": platform_label(rec),
         "task": rec.task,
         "n": s.get("n", rec.n_results),
         "score": s.get("score"),
@@ -73,15 +94,19 @@ def row_for(rec: RunRecord) -> dict[str, Any]:
 
 
 def latest_runs(settings: Settings, suite: str, models: list[str] | None = None) -> list[Path]:
-    """Latest run per (model, task) for a suite."""
-    latest: dict[tuple[str, str], Path] = {}
+    """Latest run per (model, task, platform, backend) for a suite.
+
+    Keying on the platform keeps a Halo run of gpt-oss-120b from silently replacing the Spark
+    run of the same model in the table; the two show up side by side instead.
+    """
+    latest: dict[tuple[str, str, str, str | None], Path] = {}
     for run_dir in list_runs(settings, suite):
         rec = load_run(run_dir)
         if models and rec.model not in models:
             continue
         if rec.finished is None:
             continue
-        latest[(rec.model, rec.task)] = run_dir  # list_runs is sorted by timestamp
+        latest[(rec.model, rec.task, *platform_key(rec))] = run_dir  # list_runs sorted by time
     return list(latest.values())
 
 
@@ -198,18 +223,25 @@ def _rich_table(title: str, columns: list[tuple[str, str]], rows: list[dict[str,
 def comparison_group(
     run_dirs: list[Path],
 ) -> dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]]:
-    """Latest gpt-oss runs plus the latest OpenAI/Terra run, grouped by task.
+    """Latest gpt-oss runs plus the latest OpenAI/Terra run, grouped by task (and platform).
 
-    Emits a task only when at least two gpt-oss runs and one frontier run are present.
+    Emits a group only when at least two gpt-oss runs from the same platform/backend and one
+    frontier run are present. With runs from several platforms the key becomes
+    ``"<task> [<platform>]"`` so each box gets its own block; the frontier run is shared.
     """
     out: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
     for task, runs in _load_task_runs(run_dirs).items():
-        oss = [r for r in runs if _is_oss(r[0].model)]
         frontier = [r for r in runs if _is_frontier(r[0].model)]
-        if len(oss) < 2 or not frontier:
+        if not frontier:
             continue
-        picked = sorted(oss, key=lambda r: r[0].model) + frontier[-1:]
-        out[task] = picked
+        oss_by_platform: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
+        for r in runs:
+            if _is_oss(r[0].model):
+                oss_by_platform.setdefault(platform_label(r[0]), []).append(r)
+        eligible = {p: rs for p, rs in oss_by_platform.items() if len(rs) >= 2}
+        for plat, oss in sorted(eligible.items()):
+            key = task if len(eligible) == 1 else f"{task} [{plat}]"
+            out[key] = sorted(oss, key=lambda r: r[0].model) + frontier[-1:]
     return out
 
 
@@ -341,6 +373,108 @@ def comparison_blocks(
     return tables, "\n".join(md_parts)
 
 
+HARDWARE_COLUMNS = [
+    ("platform", "platform"),
+    ("score", "score"),
+    ("paired", "paired"),
+    ("truncated", "truncated"),
+    ("ttft p50 s", "ttft_p50_s"),
+    ("total p50 s", "total_p50_s"),
+    ("total p95 s", "total_p95_s"),
+    ("prompt t/s", "prompt_tps_p50"),
+    ("decode t/s", "decode_tps_p50"),
+    ("ctx", "n_ctx"),
+    ("gpu", "gpu"),
+    ("build", "build"),
+]
+
+
+def _accuracy_hardware_rows(
+    runs: list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]],
+) -> list[dict[str, Any]]:
+    answered = [{i for i, r in results.items() if _answered(r)} for _, _, results in runs]
+    common = set.intersection(*answered) if answered else set()
+    rows: list[dict[str, Any]] = []
+    for rec, _, results in runs:
+        s = rec.summary
+        c, n, _ = _score_on(results, common)
+        rows.append(
+            {
+                "platform": platform_label(rec),
+                "score": s.get("score"),
+                "paired": _frac(c, n),
+                "truncated": s.get("truncated"),
+                "ttft_p50_s": s.get("ttft_p50_s"),
+                "total_p50_s": s.get("total_p50_s"),
+                "total_p95_s": s.get("total_p95_s"),
+                "prompt_tps_p50": s.get("prompt_tps_p50"),
+                "decode_tps_p50": s.get("decode_tps_p50"),
+                "n_ctx": rec.server.get("n_ctx_per_slot"),
+                "gpu": rec.provenance.gpu.get("name") or "-",
+                "build": build_label(rec),
+            }
+        )
+    rows.sort(key=lambda r: r["platform"])
+    return rows
+
+
+def _perf_hardware_rows(
+    runs: list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]],
+) -> tuple[list[tuple[str, str]], list[dict[str, Any]]]:
+    """One row per input length; one column per platform with cold TTFT / pp / tg."""
+    labels = sorted({platform_label(rec) for rec, _, _ in runs})
+    cols = [("length", "length")] + [(lab, lab) for lab in labels]
+    by_len: dict[int, dict[str, str]] = {}
+    for rec, _, results in runs:
+        lab = platform_label(rec)
+        for r in results.values():
+            if r.get("kind") != "cold" or not r.get("fits"):
+                continue
+            cell = (
+                f"ttft {_fmt(r.get('ttft_s'))}s / pp {_fmt(r.get('prompt_tps'))} / "
+                f"tg {_fmt(r.get('decode_tps'))} t/s"
+            )
+            by_len.setdefault(int(r["length"]), {})[lab] = cell
+    rows = [
+        {"length": length, **{lab: cells.get(lab, "-") for lab in labels}}
+        for length, cells in sorted(by_len.items())
+    ]
+    return cols, rows
+
+
+def hardware_blocks(run_dirs: list[Path]) -> tuple[list[Table], str]:
+    """Same model + task on more than one platform/backend: the Spark-vs-Halo tables."""
+    groups: dict[tuple[str, str], list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
+    for d in run_dirs:
+        rec = load_run(d)
+        if rec.server.get("provider"):
+            continue
+        results = {r.get("id") or f"{r.get('kind')}:{r.get('length')}": r for r in load_results(d)}
+        groups.setdefault((rec.model, rec.task), []).append((rec, d, results))
+    tables: list[Table] = []
+    md: list[str] = []
+    for (model, task), runs in sorted(groups.items()):
+        if len({platform_label(rec) for rec, _, _ in runs}) < 2:
+            continue
+        title = f"{model} {task}"
+        if task == "perf":
+            cols, rows = _perf_hardware_rows(runs)
+        else:
+            cols, rows = HARDWARE_COLUMNS, _accuracy_hardware_rows(runs)
+        if not rows:
+            continue
+        if not md:
+            md.append("\n## Hardware: same model, different box\n")
+            md.append(
+                "Rows are (platform/backend); `paired` scores every run on the items all of them "
+                "answered. Latency includes each box's own prefill, so the "
+                "gap is the hardware gap.\n"
+            )
+        tables.append(_rich_table(f"hardware: {title}", cols, rows))
+        md.append(_render_md(title, cols, rows))
+    return tables, "\n".join(md)
+
+
 def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
     rows = []
     for d in run_dirs:
@@ -385,6 +519,11 @@ def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
         console.print(t)
     if cmp_md:
         md.append(cmp_md)
+    hw_tables, hw_md = hardware_blocks(run_dirs)
+    for t in hw_tables:
+        console.print(t)
+    if hw_md:
+        md.append(hw_md)
     return table, "\n".join(md) + "\n"
 
 

@@ -62,10 +62,10 @@ def endpoint_for(
 ) -> Endpoint:
     spec = registry.get(model)
     listen = port or spec.port or settings.base_port
-    ep = Endpoint(host, listen, model=model)
+    ep = Endpoint(host, listen, model=model, timeout_s=settings.eval_timeout_s)
     if not ep.healthy():
         raise RuntimeError(
-            f"{model} is not serving on {host}:{listen}; run: spark-llm serve {model}"
+            f"{model} is not serving on {host}:{listen}; run: local-llm serve {model}"
         )
     return ep
 

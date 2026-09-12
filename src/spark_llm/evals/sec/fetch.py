@@ -54,7 +54,7 @@ class Edgar:
         if not user_agent or "@" not in user_agent:
             raise ValueError(
                 "EDGAR requires a descriptive User-Agent with a contact email; set "
-                "SPARK_LLM_EDGAR_USER_AGENT='spark-llm you@example.com'"
+                "LOCAL_LLM_EDGAR_USER_AGENT='local-llm you@example.com'"
             )
         self._client = httpx.Client(
             headers={"User-Agent": user_agent, "Accept-Encoding": "gzip, deflate"},
@@ -121,7 +121,7 @@ def load_manifest(settings: Settings) -> Manifest:
     path = manifest_path(settings)
     if not path.is_file():
         raise FileNotFoundError(
-            f"SEC corpus not fetched yet ({path}); run: spark-llm eval sec fetch"
+            f"SEC corpus not fetched yet ({path}); run: local-llm eval sec fetch"
         )
     return Manifest.model_validate_json(path.read_text())
 

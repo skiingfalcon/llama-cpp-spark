@@ -1,8 +1,8 @@
-| model | task | n | score | skipped | truncated | ttft p50 s | total p50 s | prompt t/s | decode t/s | tokens | cached | reasoning | ctx | build | note |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| openai:gpt-5.6-terra | extract-full | 121 | 0.992 | 0 | 0 | 1.44 | 1.55 | - | - | 12394653 | 0 | 1260 | 1050000 | openai/api | - |
-| gpt-oss-120b | extract-full | 121 | 0.983 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | - |
-| gpt-oss-20b | extract-full | 121 | 0.876 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | - |
+| model | task | n | score | skipped | truncated | ttft p50 s | total p50 s | prompt t/s | decode t/s | tokens | cached | reasoning | ctx | build | platform | note |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| openai:gpt-5.6-terra | extract-full | 121 | 0.992 | 0 | 0 | 1.44 | 1.55 | - | - | 12394653 | 0 | 1260 | 1050000 | openai/api | api | - |
+| gpt-oss-120b | extract-full | 121 | 0.983 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
+| gpt-oss-20b | extract-full | 121 | 0.876 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
 
 > warning: task extract-full: runs use different configs (9466ddd63b34, 9cc51d84df5a, ea71250ebf92)
 

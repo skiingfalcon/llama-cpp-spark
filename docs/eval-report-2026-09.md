@@ -20,7 +20,7 @@ Use the paired column for like-for-like comparison.
 ```mermaid
 flowchart LR
   edgar[("EDGAR 10-K + XBRL facts")] --> corpus["evals/data/sec (gitignored)"]
-  corpus --> runner["spark-llm eval sec run"]
+  corpus --> runner["local-llm eval sec run"]
   runner -->|"local :8080 / :8082"| oss["gpt-oss-20b / 120b"]
   runner -->|"api.openai.com"| terra["gpt-5.6-terra"]
   oss --> artifacts["state/evals/sec/..."]
@@ -183,29 +183,29 @@ treating 96.4% as a final number.
 
 ```bash
 cd ~/projects/llama-cpp-spark
-export SPARK_LLM_EDGAR_USER_AGENT="spark-llm you@example.com"
+export LOCAL_LLM_EDGAR_USER_AGENT="local-llm you@example.com"
 
 # Corpus (once)
-uv run spark-llm eval sec fetch
+uv run local-llm eval sec fetch
 
 # Local 20b (auto-negotiates full context when ctx_size = 0)
-uv run spark-llm serve gpt-oss-20b
-uv run spark-llm eval sec run gpt-oss-20b --task extract-full --forms 10-K
-uv run spark-llm stop gpt-oss-20b
+uv run local-llm serve gpt-oss-20b
+uv run local-llm eval sec run gpt-oss-20b --task extract-full --forms 10-K
+uv run local-llm stop gpt-oss-20b
 
 # Local 120b (models.toml now defaults to 131072)
-uv run spark-llm serve gpt-oss-120b
-uv run spark-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
-uv run spark-llm stop gpt-oss-120b
+uv run local-llm serve gpt-oss-120b
+uv run local-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
+uv run local-llm stop gpt-oss-120b
 
 # Frontier (OPENAI_API_KEY from .env)
-uv run spark-llm eval sec run gpt-5.6-terra \
+uv run local-llm eval sec run gpt-5.6-terra \
   --provider openai \
   --task extract-full \
   --forms 10-K
 
 # Table of latest finished runs
-uv run spark-llm eval report --suite sec
+uv run local-llm eval report --suite sec
 ```
 
 ## What changed since this run

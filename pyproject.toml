@@ -1,7 +1,7 @@
 [project]
 name = "spark-llm"
 version = "0.1.0"
-description = "Native llama.cpp CUDA inference for NVIDIA DGX Spark (GB10 / sm_121)"
+description = "llama.cpp inference and eval harness for local boxes: NVIDIA DGX Spark (CUDA), AMD Strix Halo (Vulkan/HIP, Windows)"
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.16.0",
@@ -19,7 +19,8 @@ dependencies = [
 ]
 
 [project.scripts]
-spark-llm = "spark_llm.cli:app"
+local-llm = "spark_llm.cli:app"
+spark-llm = "spark_llm.cli:app"  # deprecated alias, kept for existing scripts and docs
 
 [dependency-groups]
 dev = [

@@ -1,9 +1,9 @@
 """Kernel-throughput smoke test: wrap llama-bench with the *served* configuration.
 
 This measures raw prompt-processing / token-generation speed for a GGUF on this build.
-It says nothing about task quality or serving behaviour under load; use ``spark-llm eval``
+It says nothing about task quality or serving behaviour under load; use ``local-llm eval``
 for those. What it does guarantee is that the numbers are taken with the same batch,
-ubatch, GPU-layer, flash-attention and KV-cache settings that ``spark-llm serve`` uses,
+ubatch, GPU-layer, flash-attention and KV-cache settings that ``local-llm serve`` uses,
 and that every run is persisted with build provenance under ``state/bench/``.
 """
 
@@ -20,6 +20,7 @@ from rich.table import Table
 
 from spark_llm.config import Settings, get_settings
 from spark_llm.gpu import busy_reasons
+from spark_llm.platforms import current as current_platform
 from spark_llm.provenance import Provenance, collect
 from spark_llm.registry import Defaults, ModelKind, ModelSpec, load_registry
 from spark_llm.server import RuntimeParams, merge_runtime, runtime_env
@@ -38,7 +39,7 @@ class BenchOptions:
 
 
 def bench_binary(settings: Settings) -> Path:
-    return settings.vendor_dir / "build" / "bin" / "llama-bench"
+    return current_platform().bench_binary(settings)
 
 
 def _flash_attn_flag(value: str) -> str:
@@ -79,7 +80,7 @@ def bench_argv(
     rt = merge_runtime(spec, defaults, settings)
     if rt.model_path is None or not rt.model_path.is_file():
         raise FileNotFoundError(
-            f"model weights missing for {spec.name}; run: spark-llm download {spec.name}"
+            f"model weights missing for {spec.name}; run: local-llm download {spec.name}"
         )
     depths, skipped = usable_depths(opts.depth, opts.pp, rt.ctx_size)
     argv = [

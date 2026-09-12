@@ -1,10 +1,13 @@
-"""Typer CLI: build, models, download, serve, chat, bench, eval, doctor, stop."""
+"""Typer CLI: build, models, download, serve, chat, bench, eval, doctor, stop.
+
+Installed as ``local-llm`` (and the deprecated alias ``spark-llm``). Platform-specific behaviour
+(build vs zip install, process control, telemetry, doctor checks) is delegated to
+:mod:`spark_llm.platforms`; this module stays the same on the Spark and the Halo box.
+"""
 
 from __future__ import annotations
 
-import os
-import shutil
-import subprocess
+import sys
 from pathlib import Path
 
 import httpx
@@ -14,11 +17,11 @@ from rich.table import Table
 
 from spark_llm.bench import BenchOptions, compare_runs, print_bench_run, run_bench
 from spark_llm.client import chat_once
-from spark_llm.config import get_settings, repo_root
+from spark_llm.config import Settings, get_settings, repo_root
 from spark_llm.download import download_hf_ref, download_model, resolve_weights
 from spark_llm.evals.cli import eval_app
-from spark_llm.gpu import split_gpu_processes
-from spark_llm.provenance import built_cuda_arch
+from spark_llm.platforms import current as current_platform
+from spark_llm.platforms.base import BuildOptions
 from spark_llm.registry import ModelKind, ModelSpec, load_registry
 from spark_llm.server import (
     ServeOverrides,
@@ -26,41 +29,78 @@ from spark_llm.server import (
     binary_path,
     build_argv,
     load_state,
-    project_build_script,
     start_server,
     stop_servers,
 )
 
 app = typer.Typer(
-    name="spark-llm",
-    help="llama.cpp CUDA inference on NVIDIA DGX Spark (GB10 / sm_121).",
+    name="local-llm",
+    help="llama.cpp inference and eval harness for local boxes (DGX Spark, AMD Strix Halo).",
     add_completion=False,
     no_args_is_help=True,
 )
 console = Console()
 app.add_typer(eval_app, name="eval")
 
+BACKEND_OPT = typer.Option(
+    None,
+    "--backend",
+    help="GPU backend of the llama.cpp binary: Spark cuda; Halo vulkan | hip (LOCAL_LLM_BACKEND)",
+)
+
+
+@app.callback()
+def _root() -> None:
+    if Path(sys.argv[0]).stem == "spark-llm":
+        console.print("[dim]note: spark-llm is now local-llm; the old name keeps working[/dim]")
+
 
 def _passthrough(ctx: typer.Context) -> list[str]:
     return list(ctx.args) if ctx.args else []
 
 
+def _with_backend(settings: Settings, backend: str | None) -> Settings:
+    """Apply --backend for this invocation and validate the effective backend (flag or env)."""
+    plat = current_platform()
+    if backend is not None:
+        settings = settings.model_copy(update={"backend": backend})
+    effective = settings.backend
+    if effective is not None and effective.lower() not in plat.supported_backends():
+        console.print(
+            f"[red]backend {effective!r} not available on {plat.name}[/red]; "
+            f"choose from {', '.join(plat.supported_backends())}"
+        )
+        raise typer.Exit(2)
+    return settings
+
+
 @app.command()
-def build() -> None:
-    """Clone/pin and compile llama.cpp with CUDA for sm_121a."""
-    script = project_build_script()
-    if not script.is_file():
-        console.print(f"[red]missing[/red] {script}")
-        raise typer.Exit(1)
-    raise typer.Exit(subprocess.call(["bash", str(script)]))
+def build(
+    backend: str | None = typer.Option(
+        None,
+        "--backend",
+        help="Halo: vulkan | hip | both (default both). Spark builds CUDA only.",
+    ),
+    source: str = typer.Option(
+        "official", "--source", help="Halo hip zip source: official (ggml-org) | lemonade"
+    ),
+    tag: str | None = typer.Option(None, "--tag", help="llama.cpp release tag (Halo zips)"),
+    asset: str | None = typer.Option(None, "--asset", help="Exact release asset name (Halo)"),
+    force: bool = typer.Option(False, "--force", help="Reinstall even if already present"),
+) -> None:
+    """Build llama.cpp (Spark: pinned CMake/CUDA source build) or install prebuilt zips (Halo)."""
+    settings = get_settings()
+    backends = [b.strip() for b in backend.split(",") if b.strip()] if backend else []
+    opts = BuildOptions(backends=backends, tag=tag, source=source, asset=asset, force=force)
+    raise typer.Exit(current_platform().build(settings, opts))
 
 
 @app.command("models")
 def models_cmd() -> None:
-    """List models registered in models.toml."""
+    """List models registered in the platform's models*.toml."""
     settings = get_settings()
     reg = load_registry(settings=settings)
-    table = Table(title="models.toml")
+    table = Table(title=settings.models_toml.name)
     table.add_column("name")
     table.add_column("kind")
     table.add_column("port")
@@ -81,9 +121,9 @@ def models_cmd() -> None:
 
 @app.command()
 def download(
-    name: str = typer.Argument(..., help="Registered model name from models.toml"),
+    name: str = typer.Argument(..., help="Registered model name from the registry"),
 ) -> None:
-    """Download a registered model's GGUF(s) into SPARK_LLM_MODELS_DIR."""
+    """Download a registered model's GGUF(s) into LOCAL_LLM_MODELS_DIR."""
     settings = get_settings()
     reg = load_registry(settings=settings)
     path = download_model(reg.get(name), settings)
@@ -108,6 +148,7 @@ def serve(
     host: str | None = typer.Option(None, "--host", help="Override bind host"),
     n_gpu_layers: int | None = typer.Option(None, "--n-gpu-layers", "-ngl"),
     ctx_size: int | None = typer.Option(None, "--ctx-size", "-c"),
+    backend: str | None = BACKEND_OPT,
     foreground: bool = typer.Option(
         False, "--foreground", "-f", help="Stay attached (single model only)"
     ),
@@ -116,12 +157,14 @@ def serve(
 
     Extra args after `--` are appended verbatim to llama-server.
     """
-    settings = get_settings()
+    settings = _with_backend(get_settings(), backend)
     extra = _passthrough(ctx)
     names = names or []
 
     if not binary_path(settings).is_file():
-        console.print("[red]llama-server missing[/red]; run: spark-llm build")
+        console.print(
+            f"[red]llama-server missing[/red] ({binary_path(settings)}); run: local-llm build"
+        )
         raise typer.Exit(1)
 
     if hf or model_path:
@@ -234,6 +277,7 @@ def bench(
     ),
     reps: int = typer.Option(5, "--reps", help="Repetitions per test (llama-bench -r)"),
     force: bool = typer.Option(False, "--force", help="Bench even if the GPU is busy"),
+    backend: str | None = BACKEND_OPT,
     compare: list[Path] | None = typer.Option(
         None, "--compare", help="Two saved state/bench/*.json files to diff (no bench run)"
     ),
@@ -241,7 +285,7 @@ def bench(
     """Kernel-throughput smoke test (llama-bench) using the exact served configuration.
 
     Measures pp/tg tokens per second only. For task quality and serving latency use
-    `spark-llm eval`. Results are saved to state/bench/<timestamp>.json with build
+    `local-llm eval`. Results are saved to state/bench/<timestamp>.json with build
     provenance. Extra args after `--` are appended verbatim to llama-bench.
     """
     if compare:
@@ -253,7 +297,7 @@ def bench(
     if not names:
         console.print("[red]provide at least one registered model name[/red]")
         raise typer.Exit(1)
-    settings = get_settings()
+    settings = _with_backend(get_settings(), backend)
     opts = BenchOptions(
         pp=_int_list(pp),
         tg=_int_list(tg),
@@ -272,8 +316,9 @@ def bench(
 
 @app.command()
 def doctor() -> None:
-    """Check toolchain, binaries, GPU, and conflicting workloads."""
+    """Check toolchain, binaries, GPU, and conflicting workloads for the detected platform."""
     settings = get_settings()
+    plat = current_platform()
     ok = True
 
     def check(label: str, good: bool, detail: str) -> None:
@@ -283,61 +328,19 @@ def doctor() -> None:
             ok = False
         console.print(f"{mark}  {label}: {detail}")
 
-    check("arch", os.uname().machine == "aarch64", os.uname().machine)
-    nvcc = shutil.which("nvcc")
-    check("nvcc", bool(nvcc), nvcc or "not found")
-    if nvcc:
-        ver = subprocess.check_output([nvcc, "--version"], text=True)
-        line = [ln for ln in ver.splitlines() if "release" in ln.lower()]
-        check("cuda toolkit", bool(line), line[-1].strip() if line else ver.strip())
-
-    smi = shutil.which("nvidia-smi")
-    check("nvidia-smi", bool(smi), smi or "not found")
-    if smi:
-        out = subprocess.check_output(
-            [
-                "nvidia-smi",
-                "--query-gpu=name,driver_version,compute_cap",
-                "--format=csv,noheader",
-            ],
-            text=True,
-        ).strip()
-        check("gpu", "GB10" in out or "12.1" in out, out)
-        ours, foreign = split_gpu_processes(settings)
-        if foreign:
-            check("gpu free", False, "; ".join(p.raw for p in foreign))
-        elif ours:
-            console.print(
-                f"[yellow]note[/yellow]  gpu in use by spark-llm: {'; '.join(p.raw for p in ours)}"
-            )
+    try:
+        backend = plat.backend(settings)
+    except ValueError as exc:
+        backend = f"invalid ({exc})"
+        ok = False
+    console.print(f"[cyan]platform[/cyan] {plat.name} (backend {backend})")
+    for c in plat.doctor_checks(settings):
+        if c.note:
+            console.print(f"[yellow]note[/yellow]  {c.label}: {c.detail}")
         else:
-            check("gpu free", True, "no compute apps")
+            check(c.label, c.ok, c.detail)
 
-    cmake = shutil.which("cmake")
-    check("cmake", bool(cmake), cmake or "not found (uv tool install 'cmake>=3.30')")
-    server = binary_path(settings)
-    check("llama-server", server.is_file(), str(server))
-    if server.is_file():
-        from spark_llm.server import runtime_env
-
-        try:
-            ver = subprocess.check_output(
-                [str(server), "--version"],
-                text=True,
-                stderr=subprocess.STDOUT,
-                env=runtime_env(settings),
-            )
-            check("llama-server version", True, ver.splitlines()[0][:120])
-        except Exception as exc:  # noqa: BLE001
-            check("llama-server version", False, str(exc))
-        arch = built_cuda_arch(settings)
-        check(
-            "cuda arch",
-            arch is not None and arch.startswith("121a"),
-            arch or "unknown (rebuild with make build to record it)",
-        )
-
-    check("models.toml", settings.models_toml.is_file(), str(settings.models_toml))
+    check(settings.models_toml.name, settings.models_toml.is_file(), str(settings.models_toml))
     check("models_dir", settings.models_dir.is_dir(), str(settings.models_dir))
     check("repo", (repo_root() / "pyproject.toml").is_file(), str(repo_root()))
 

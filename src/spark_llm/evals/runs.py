@@ -67,8 +67,13 @@ class RunWriter:
         provenance: Provenance | None = None,
     ) -> None:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        self.dir = evals_root(settings) / suite / path_safe(model) / f"{stamp}-{task}"
-        self.dir.mkdir(parents=True, exist_ok=True)
+        base = evals_root(settings) / suite / path_safe(model) / f"{stamp}-{task}"
+        self.dir = base
+        n = 1
+        while self.dir.exists():  # two runs in the same second must not share a directory
+            n += 1
+            self.dir = base.with_name(f"{base.name}-{n}")
+        self.dir.mkdir(parents=True, exist_ok=False)
         prov = provenance or collect(settings, with_gpu=True)
         self.record = RunRecord(
             suite=suite,

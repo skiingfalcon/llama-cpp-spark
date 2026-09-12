@@ -17,7 +17,7 @@ vendor/
 models/
 *.gguf
 
-# Eval corpora and cloned external harnesses (regenerate with spark-llm eval …)
+# Eval corpora and cloned external harnesses (regenerate with local-llm eval …)
 evals/data/
 evals/tools/
 

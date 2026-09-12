@@ -51,3 +51,19 @@ def test_large_model_file_on_120b() -> None:
     assert "120b" in (spec.file or "").lower()
     assert spec.local_path(Path("/opt/models")).name.endswith(".gguf")
     assert spec.n_gpu_layers == 70
+
+
+def test_halo_registry_mirrors_model_names_and_ports() -> None:
+    from spark_llm.config import Settings, repo_root
+
+    spark = load_registry()
+    halo = load_registry(settings=Settings(models_toml=repo_root() / "models.halo.toml"))
+    for name in ("gpt-oss-20b", "gpt-oss-120b", "qwen3-8b", "qwen3-embedding-4b"):
+        assert name in halo.models, name
+        assert halo.models[name].port == spark.models[name].port
+        assert halo.models[name].file == spark.models[name].file
+    # Strix Halo serving knobs, not Spark's
+    assert halo.defaults.host == "127.0.0.1" and halo.defaults.ubatch_size == 512
+    assert halo.models["gpt-oss-120b"].n_gpu_layers is None  # inherits 999 from defaults
+    assert "--no-mmap" in halo.models["gpt-oss-120b"].extra_args
+    assert "--jinja" in halo.models["gpt-oss-120b"].extra_args
