@@ -59,8 +59,10 @@ Two readings:
 - **On equal footing (full document in context), 120b ties Terra: 103/104 each.** The
   frontier model's remaining edge on this suite comes almost entirely from its 1.05M window
   reading GS and STWD whole while the local models work from an excerpt.
-- The Item 8 fallback works well for 120b (16/17) and poorly for 20b (12/17). When the
-  metric lives outside the excerpt (GS's cash-flow statement), no model can answer from it.
+- The Item 8 fallback works well for 120b (16/17) and poorly for 20b (12/17). The excerpt
+  itself is complete: parsing the GS 10-K with the harness shows Item 8 spans 460K characters
+  and contains the consolidated balance sheet, cash-flow statement and notes. The one 120b
+  miss inside it is a wrong-statement pick, not a missing statement (see below).
 
 ### Per-tag accuracy
 
@@ -105,8 +107,14 @@ models* to near-perfect, confirming harness ambiguity rather than model weakness
 **gpt-oss-120b (2):**
 
 - GS operating cash flow: answered +17.0B vs expected −45.2B. The 20b gave the *identical*
-  wrong number — the correct figure sits in GS's consolidated statement of cash flows, which
-  the Item 8 excerpt boundary appears to clip. Harness section-boundary issue, not model error.
+  wrong number. Both values are inside the Item 8 excerpt: −45,154 is on the consolidated
+  statement of cash flows (line reads "Net cash **used for** operating activities"), while
+  17,007 is the parent-company-only condensed cash-flow statement in the notes (line reads
+  "Net cash **provided by** operating activities"). The question asks for "net cash provided
+  by operating activities", so both local models matched the wording literally and took the
+  parent-only line. Terra, reading the whole filing, did not. This is a model miss with a
+  label-wording contributor, not a section-boundary problem; the harness follow-up is to word
+  the question "consolidated net cash provided by (used for) operating activities".
 - CAT `LongTermDebtNoncurrent`: answered 50.7B (consolidated, incl. Financial Products
   captive-finance debt) vs expected 30.7B. Genuine which-line ambiguity for industrials with
   finance arms.
@@ -135,8 +143,13 @@ GS Item-8 questions, NEE Assets/Liabilities (subsidiary-level totals), HD NetInc
   the same 240K-token filing re-paid full input price every time.
 - Local prefix caching reused 90% of prompt tokens. That asymmetry is the core
   unit-economics argument for local serving on many-questions-per-document workloads.
-- Local TTFT p50 dropped to 0.4–0.6 s (first run: 3.7–6.1 s) — warm cache and no truncated
-  re-reasoning; the p95 (~40–60 s) is each new filing's cold prefill.
+- **Local TTFT is not comparable to the first run.** The client now stamps time-to-first-token
+  on the first streamed *reasoning* delta; the first run stamped it on the first visible
+  answer token, after reasoning had finished (every first-run 120b item had TTFT within 1 s of
+  total time; no re-run item does). The re-run's 0.4–0.6 s p50 is a true first-token latency,
+  the first run's 3.7–6.1 s was effectively total latency. Compare **total p50** across runs
+  instead: 3.6 s / 5.8 s now vs 4.3 s / 6.5 s before. The p95 (~40–60 s) is each new filing's
+  cold prefill.
 
 ## Pros and cons
 
@@ -153,8 +166,9 @@ GS Item-8 questions, NEE Assets/Liabilities (subsidiary-level totals), HD NetInc
 
 **Cons**
 
-- Hard 131K native context: GS/STWD answered from Item 8; anything outside the excerpt
-  (GS cash-flow statement) becomes unanswerable locally.
+- Hard 131K native context: GS/STWD answered from Item 8 rather than the whole filing.
+  Anything outside Item 8 (cover page, MD&A tables) is invisible to the local models on
+  those filings.
 - 20b is not accurate enough for unattended numeric extraction (87.6%, scale errors).
 - Slower per-answer latency than the API (3.6–5.8 s p50 vs 1.6 s), long cold prefills.
 - You own ops: serving, CUDA/llama.cpp upgrades, memory budgeting, auth in front of `0.0.0.0`.
@@ -179,8 +193,10 @@ GS Item-8 questions, NEE Assets/Liabilities (subsidiary-level totals), HD NetInc
 1. **Latency is not a hardware bake-off.** Terra numbers include network and provider queueing.
 2. **Tokenizers differ.** GGUF tokenizer vs `o200k_base`: the same corpus sums to 10.52M vs
    12.39M prompt tokens.
-3. **The GS cash-flow miss is shared by both local models with the identical wrong value** —
-   treat as an Item-8 boundary bug in the harness, not model error.
+3. **The GS cash-flow miss is shared by both local models with the identical wrong value.**
+   Verified against the parsed filing: the excerpt contains both the consolidated (−45,154)
+   and parent-only (17,007) statements; the models chose the one whose line wording matched
+   the question. Count it as a model miss; tighten the question wording.
 4. **Config hashes differ by design** between local and API runs; the report's drift warning
    is expected.
 5. Single run per model; no variance estimate. Local runs are deterministic, Terra is not.
@@ -214,14 +230,14 @@ uv run spark-llm eval report --suite sec
 
 - **`gpt-oss-120b` on the Spark is the recommendation for on-prem SEC extraction.** 98.3%
   overall, identical to Terra (103/104) whenever the document fits in 131K, zero API spend,
-  no data egress, deterministic decoding. Its two remaining misses are one harness
-  section-boundary bug (GS cash flow) and one genuine ambiguity (CAT consolidated vs
-  machinery-only debt).
+  no data egress, deterministic decoding. Its two remaining misses are both which-line picks:
+  GS parent-only vs consolidated cash flow, and CAT consolidated vs machinery-only debt.
 - **`gpt-5.6-terra` buys the last percentage point and >131K documents** for ~$25/run,
   slower wall clock under rate limits, no cache economics, and data egress. Use it when the
   filing genuinely exceeds 131K or the workload is one-shot rather than
   many-questions-per-document.
 - **`gpt-oss-20b` is not accurate enough for unattended extraction** (87.6%, scale errors on
   share counts). Keep it for latency-sensitive or memory-tight serving with human review.
-- **Next harness fix:** widen the Item 8 excerpt to include the consolidated statement of
-  cash flows — that alone would likely take 120b to 120/121.
+- **Next harness fix:** word the cash-flow question as "consolidated net cash provided by
+  (used for) operating activities" so parent-only condensed statements in the notes are not
+  a literal match. The Item 8 excerpt does not need widening.
