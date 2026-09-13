@@ -4,6 +4,7 @@ platform Protocol conformance."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -122,20 +123,31 @@ def _reset_platform():
     platforms.force(None)
 
 
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(text: str) -> str:
+    """Rich styles and wraps help text depending on the terminal; compare plain, unwrapped text."""
+    return re.sub(r"\s+", " ", _ANSI.sub("", text))
+
+
 def test_cli_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     runner = CliRunner()
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("TERM", "dumb")
+    monkeypatch.setenv("COLUMNS", "200")
     monkeypatch.setenv("LOCAL_LLM_STATE_DIR", str(tmp_path / "state"))
     monkeypatch.setenv("LOCAL_LLM_VENDOR_DIR", str(tmp_path / "vendor"))
     monkeypatch.setenv("LOCAL_LLM_MODELS_DIR", str(tmp_path / "models"))
     res = runner.invoke(app, ["build", "--help"])
-    assert res.exit_code == 0 and "--backend" in res.output
+    assert res.exit_code == 0 and "--backend" in _plain(res.output)
     res = runner.invoke(app, ["models"])
-    assert res.exit_code == 0 and "gpt-oss-120b" in res.output
+    assert res.exit_code == 0 and "gpt-oss-120b" in _plain(res.output)
     for plat in ("spark", "halo"):
         monkeypatch.setenv("LOCAL_LLM_PLATFORM", plat)
         res = runner.invoke(app, ["doctor"])
         assert res.exit_code in (0, 1), res.output  # failing checks are fine; tracebacks are not
-        assert f"platform {plat}" in res.output and "Traceback" not in res.output
+        assert f"platform {plat}" in _plain(res.output) and "Traceback" not in res.output
     monkeypatch.setenv("LOCAL_LLM_PLATFORM", "halo")
     res = runner.invoke(app, ["serve", "gpt-oss-120b", "--backend", "cuda"])
-    assert res.exit_code == 2 and "not available on halo" in res.output
+    assert res.exit_code == 2 and "not available on halo" in _plain(res.output)
