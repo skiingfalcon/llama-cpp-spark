@@ -228,7 +228,9 @@ uv run local-llm eval report --suite sec
 
 To repeat this on the AMD Strix Halo box (Windows), follow the README section
 [Windows / AMD Strix Halo](../README.md#windows--amd-strix-halo); the eval commands are the
-same and the report adds a Hardware block comparing the two machines.
+same and the report adds a Hardware block comparing the two machines. Locked-down hosts that
+can only run LM Studio should use [`scripts/lmstudio.mjs`](../scripts/lmstudio.mjs) and see
+[eval-report-2026-09-halo.md](eval-report-2026-09-halo.md).
 
 ## Bottom line for the team
 

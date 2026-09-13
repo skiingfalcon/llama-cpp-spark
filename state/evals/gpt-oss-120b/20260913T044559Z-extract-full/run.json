@@ -1,0 +1,54 @@
+{
+  "task": "extract-full",
+  "model": "openai/gpt-oss-120b",
+  "model_label": "gpt-oss-120b",
+  "platform": "halo",
+  "backend": "llama.cpp-win-x86_64-amd-rocm-avx2",
+  "runtime_version": "2.37.0",
+  "served_via": "lmstudio",
+  "quant": "MXFP4",
+  "context": 131072,
+  "decoding": {
+    "temperature": 0,
+    "seed": 42,
+    "max_tokens": 4096
+  },
+  "tolerance": 0.005,
+  "chunk_tokens": 8000,
+  "top_k": 6,
+  "token_estimate": "chars/4.6 (approximate)",
+  "started": "20260913T044559Z",
+  "n": 121,
+  "correct": 115,
+  "skipped": 0,
+  "truncated": 0,
+  "fallback": 17,
+  "off_by_scale": 1,
+  "score": 0.9504132231404959,
+  "by_mode": {
+    "full": {
+      "n": 104,
+      "correct": 101
+    },
+    "section": {
+      "n": 17,
+      "correct": 14
+    }
+  },
+  "by_form": {
+    "10-K": {
+      "n": 121,
+      "correct": 115
+    }
+  },
+  "ttft_p50": 1.193,
+  "total_p50": 7.427,
+  "total_p95": 238.354,
+  "prompt_tps_p50": 68791.02956167176,
+  "decode_tps_p50": 19.40369143398012,
+  "prompt_tokens": 9976288,
+  "reasoning_chars": 57469,
+  "wall_clock_s": 4311.501,
+  "cached_prompt_tokens": null,
+  "config_hash": "58b2946660ca"
+}

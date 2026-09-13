@@ -18,33 +18,19 @@ passing `--hf` / `--model-path`. Everything platform-specific lives under
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  toml[["models.toml"]]
-  hf[("HuggingFace GGUF repos")]
-  models[("/opt/models/*.gguf")]
+![Inference stacks: NVIDIA DGX Spark (CUDA) vs AMD Strix Halo (Vulkan / ROCm)](docs/inference-stack-spark-vs-halo.png)
 
-  subgraph project [llama-cpp-spark]
-    cli["local-llm CLI (Typer)"]
-    registry["registry.py: ModelSpec"]
-    server["server.py: layered argv merge"]
-    platforms["platforms/: spark (Linux, CUDA) | halo (Windows, Vulkan/HIP)"]
-    build["spark: scripts/build.sh · halo: release-zip installer"]
-  end
+Three ways the same `gpt-oss-120b` MXFP4 weights get served in this project:
 
-  subgraph vendor ["vendor/llama.cpp (gitignored)"]
-    bins["llama-server, llama-bench, llama-cli"]
-  end
-
-  toml --> registry
-  cli --> registry --> server
-  cli --> platforms --> build
-  build -->|"cmake, CUDA sm_121a  /  unzip win-vulkan, win-rocm"| bins
-  cli -->|"download, shard aware"| hf --> models
-  server -->|spawn| bins
-  bins -->|"mmap weights"| models
-  bins -->|"OpenAI API on per-model port"| cli
-```
+- **NVIDIA DGX Spark (CUDA)** — `local-llm` reads [`models.toml`](models.toml), merges argv in
+  `server.py`, and spawns a pinned `llama-server` built by [`scripts/build.sh`](scripts/build.sh)
+  (`platforms/spark`, ggml-cuda).
+- **AMD Strix Halo (Vulkan / ROCm)** — same CLI on Windows via `platforms/halo` and the
+  release-zip installer (`--backend vulkan|hip`); intended path when the box allows Python.
+- **AMD Strix Halo via LM Studio** — locked-down hosts that cannot install `uv` / a compiler
+  still run the extract-full suite through [`scripts/lmstudio.mjs`](scripts/lmstudio.mjs)
+  against LM Studio's bundled llama.cpp. See the
+  [Halo eval report](docs/eval-report-2026-09-halo.md) for the September 2026 numbers.
 
 ## Requirements
 
@@ -277,6 +263,13 @@ full vs section vs chunked boundaries can differ slightly; the backend is LM Stu
 runtime, not the pinned `LLAMA_CPP_RELEASE`; cached-prompt and exact prefill/decode columns are
 indicative only. Use this for an accuracy signal on a locked box, not as a drop-in replacement
 for the Spark hardware comparison. Prefer `local-llm eval sec …` whenever Python is available.
+
+**Results (September 2026):** on the same 121-question 10-K suite as the Spark re-run,
+`gpt-oss-120b` scored **117/121 (96.7%)** on AMD Strix Halo (Vulkan) and **115/121 (95.0%)**
+on AMD Strix Halo (ROCm), vs **119/121 (98.3%)** on NVIDIA DGX Spark (CUDA). Full write-up:
+[docs/eval-report-2026-09-halo.md](docs/eval-report-2026-09-halo.md) (see also
+[eval-report-2026-09-rerun.md](docs/eval-report-2026-09-rerun.md) and
+[eval-report-2026-09.md](docs/eval-report-2026-09.md)).
 
 ### Known gaps on Halo
 
