@@ -6,7 +6,6 @@ requires-python = ">=3.12"
 dependencies = [
     "typer>=0.16.0",
     "huggingface-hub>=0.30.0",
-    "openai>=1.70.0",
     "httpx>=0.28.0",
     "rich>=14.0.0",
     "pydantic-settings>=2.8.0",
@@ -25,12 +24,11 @@ spark-llm = "spark_llm.cli:app"  # deprecated alias, kept for existing scripts a
 [dependency-groups]
 dev = [
     "pytest>=8.3.0",
-    "pytest-asyncio>=0.26.0",
     "ruff>=0.11.0",
 ]
 
 [build-system]
-requires = ["uv_build>=0.9.4,<0.10.0"]
+requires = ["uv_build>=0.9.4,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.ruff]

@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     state_dir: Path = Field(default_factory=lambda: repo_root() / "state")
     host: str = "0.0.0.0"
     base_port: int = 8080
-    n_gpu_layers: int = 999
     health_timeout_s: float = 300.0
     health_poll_s: float = 1.0
     # GPU backend of the llama.cpp binary to run: cuda (Spark), vulkan | rocm (Halo). None = the
@@ -62,7 +61,9 @@ class Settings(BaseSettings):
     # Evaluation harness
     evals_toml: Path = Field(default_factory=lambda: repo_root() / "evals.toml")
     evals_data_dir: Path = Field(default_factory=lambda: repo_root() / "evals" / "data")
-    eval_host: str = "127.0.0.1"  # set to the server box's address when driving from another box
+    # Address the eval client connects to (contrast ``host``, the bind address for ``serve``).
+    # Set to the serving box when driving evals from another machine.
+    eval_host: str = "127.0.0.1"
     # Per-request timeout for eval calls; a cold 124K-token prefill on an iGPU can take a while.
     eval_timeout_s: float = Field(default_factory=lambda: _platform().eval_timeout_s())
     # EDGAR requires a descriptive UA: "App Name contact@email" (LOCAL_LLM_EDGAR_USER_AGENT)

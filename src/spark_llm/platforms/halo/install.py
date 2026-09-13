@@ -21,14 +21,15 @@ import re
 import shutil
 import subprocess
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
-from rich.console import Console
 
 from spark_llm.config import Settings, repo_root
+from spark_llm.console import err as console
 from spark_llm.platforms.base import BuildOptions
 from spark_llm.platforms.halo.platform import (
     BACKEND_ALIASES,
@@ -40,14 +41,12 @@ from spark_llm.platforms.halo.platform import (
     parse_version_output,
     save_build_info,
 )
-
-console = Console(stderr=True)
+from spark_llm.provenance import pinned_commit
 
 API = "https://api.github.com"
 OFFICIAL_REPO = "ggml-org/llama.cpp"
 LEMONADE_REPO = "lemonade-sdk/llamacpp-rocm"
 RELEASE_FILE = "LLAMA_CPP_RELEASE"
-VERSION_FILE = "LLAMA_CPP_VERSION"
 ASSET_PATTERNS = {
     ("official", "vulkan"): re.compile(r"^llama-.*-bin-win-vulkan-x64\.zip$"),
     ("official", "rocm"): re.compile(r"^llama-.*-bin-win-rocm-[\d.]+-x64\.zip$"),
@@ -60,11 +59,6 @@ SOURCES = ("official", "lemonade")
 class ResolvedTag:
     tag: str
     note: str | None  # None when the tag is exactly the pinned commit
-
-
-def pinned_commit() -> str | None:
-    path = repo_root() / VERSION_FILE
-    return path.read_text().strip() if path.is_file() else None
 
 
 def pinned_release() -> str | None:
@@ -90,7 +84,10 @@ def _headers() -> dict[str, str]:
 def _get(client: httpx.Client, url: str, **params: Any) -> Any:
     r = client.get(url, params=params or None, headers=_headers())
     r.raise_for_status()
-    return r.json()
+    try:
+        return r.json()
+    except ValueError as exc:  # HTML error page, proxy interstitial, ...
+        raise RuntimeError(f"unexpected non-JSON response from {url}") from exc
 
 
 def resolve_tag(client: httpx.Client, commit: str | None, explicit: str | None) -> ResolvedTag:
@@ -173,15 +170,15 @@ def extract(zip_path: Path, dest: Path) -> Path:
     return hits[0].parent
 
 
-def probe(bin_dir: Path, env: dict[str, str]) -> dict[str, Any]:
+def probe(
+    bin_dir: Path, env: dict[str, str], run: Callable[..., Any] = subprocess.run
+) -> dict[str, Any]:
     """Version, commit and visible devices from the extracted binary; empty on non-Windows."""
     exe = bin_dir / SERVER_EXE
     out: dict[str, Any] = {"server_version": None, "commit": None, "devices": []}
     for flag, key in (("--version", "version"), ("--list-devices", "devices")):
         try:
-            res = subprocess.run(
-                [str(exe), flag], capture_output=True, text=True, env=env, timeout=60
-            )
+            res = run([str(exe), flag], capture_output=True, text=True, env=env, timeout=60)
             text = (res.stdout or "") + (res.stderr or "")
         except (OSError, subprocess.TimeoutExpired):
             continue
@@ -258,7 +255,7 @@ def install(settings: Settings, opts: BuildOptions, client: httpx.Client | None 
                 if source == "official"
                 else "lemonade tracks its own upstream commit",
             }
-            entry.update(probe(bin_dir, platform.runtime_env(settings)))
+            entry.update(probe(bin_dir, platform.runtime_env(settings), run=platform._run))
             pinned = pinned_commit()
             if (
                 pinned
@@ -281,6 +278,9 @@ def install(settings: Settings, opts: BuildOptions, client: httpx.Client | None 
             console.print(f"[green]installed[/green] {backend} -> {bin_dir}")
     except (httpx.HTTPError, RuntimeError, zipfile.BadZipFile) as exc:
         console.print(f"[red]{exc}[/red]")
+        rc = 1
+    except KeyError as exc:
+        console.print(f"[red]unexpected GitHub API response[/red]: missing {exc}")
         rc = 1
     except OSError as exc:
         console.print(

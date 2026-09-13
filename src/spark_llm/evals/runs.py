@@ -107,8 +107,8 @@ class RunRecord(BaseModel):
             timestamp=started or "",
             hostname=str(data.get("hostname") or "?"),
             machine=str(data.get("machine") or "x86_64"),
-            spark_llm_version=f"lmstudio.mjs/{version or '?'}",
-            cuda_arch=f"{backend}:lmstudio-{version or '?'}",
+            tool_version=f"lmstudio.mjs/{version or '?'}",
+            build_id=f"{backend}:lmstudio-{version or '?'}",
             platform=platform,
             backend=backend,
             llama_cpp_release=version,
@@ -261,9 +261,20 @@ class RunWriter:
     def finish(self, summary: dict[str, Any]) -> RunRecord:
         self.record.summary = summary
         self.record.finished = datetime.now(UTC).isoformat(timespec="seconds")
-        self._results.close()
+        if not self._results.closed:
+            self._results.close()
         self.flush_record()
         return self.record
+
+    def __enter__(self) -> RunWriter:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
+        if exc is not None and self.record.finished is None:
+            # Keep the run visible in reports as aborted instead of an unfinished ghost.
+            self.finish({"aborted": f"{exc_type.__name__}: {exc}", "n": self.record.n_results})
+        elif not self._results.closed:
+            self._results.close()
 
 
 def load_run(run_dir: Path) -> RunRecord:

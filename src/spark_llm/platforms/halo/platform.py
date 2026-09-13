@@ -1,8 +1,8 @@
 """Strix Halo on Windows: prebuilt llama-server zips, Windows process control, CIM telemetry.
 
 Design notes (see README "Windows / AMD Strix Halo"):
-- Two backends may be installed side by side (``vendor/halo-build.json``); ``settings.backend``
-  picks one per serve so Vulkan and HIP runs are recorded and compared separately.
+- Two backends may be installed side by side (``vendor/llama.cpp/halo-build.json``);
+  ``settings.backend`` picks one per serve so Vulkan and ROCm runs are recorded separately.
 - On a unified-memory APU the number that matters is total memory in use, not "GPU memory";
   :meth:`gpu_memory_used_mib` returns that and the perf task labels it ``unified_mem``.
 - Everything here imports on Linux so it can be unit-tested; Windows-only calls are guarded.
@@ -21,12 +21,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console
-
 from spark_llm.config import Settings, repo_root
 from spark_llm.platforms.base import BuildOptions, DoctorCheck, GpuProcess
-
-console = Console(stderr=True)
 
 BUILD_FILE = "halo-build.json"
 BACKENDS = ("vulkan", "rocm")
@@ -119,8 +115,7 @@ class HaloPlatform:
         return self.bin_dir(settings) / BENCH_EXE
 
     def runtime_env(self, settings: Settings) -> dict[str, str]:
-        """DLLs (Vulkan loader shim, HIP runtime) sit next to the "
-        "exe; put that dir first on PATH."""
+        """DLLs (Vulkan loader, HIP runtime) sit next to the exe; put that dir first on PATH."""
         env = os.environ.copy()
         bin_dir = str(self.bin_dir(settings))
         existing = env.get("PATH", "")

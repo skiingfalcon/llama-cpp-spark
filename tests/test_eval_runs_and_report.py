@@ -79,7 +79,7 @@ def test_run_writer_roundtrip(tmp_path: Path) -> None:
     assert rec.n_results == 2 and rec.finished is not None
     loaded = load_run(w.dir)
     assert loaded.model == "gpt-oss-20b" and loaded.summary["score"] == 0.5
-    assert loaded.provenance.cuda_arch == "121a-real"
+    assert loaded.provenance.build_id == "121a-real"  # loaded via the cuda_arch alias
     assert [r["id"] for r in load_results(w.dir)] == ["a", "b"]
     assert list_runs(settings, "sec") == [w.dir]
     assert list_runs(settings, "swe") == []

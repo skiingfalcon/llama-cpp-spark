@@ -16,19 +16,17 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from rich.console import Console
 
 from spark_llm.config import Settings
+from spark_llm.console import err as console
 from spark_llm.evals.config import EvalConfig, SweTier
 from spark_llm.evals.endpoint import Endpoint
 from spark_llm.evals.runs import RunRecord, RunWriter, evals_root
-from spark_llm.evals.sec.run import endpoint_for
+from spark_llm.evals.serving import endpoint_for
 from spark_llm.evals.swe.check import tool_call_check
 from spark_llm.evals.swe.normalize import normalize_aider, normalize_evalplus, normalize_swebench
 from spark_llm.registry import load_registry
 from spark_llm.server import merge_runtime
-
-console = Console(stderr=True)
 
 
 @dataclass
@@ -196,7 +194,7 @@ def run_tier2(
     env = _endpoint_env(opts.host, port)
     bench_root = aider_dir / "tmp.benchmarks"
     bench_root.mkdir(exist_ok=True)
-    run_name = f"spark-{model}-{writer.dir.name}"
+    run_name = f"local-llm-{model}-{writer.dir.name}"
     workers = opts.workers or tier.workers
     # Built by aider's benchmark/docker_build.sh; host networking so 127.0.0.1 is reachable.
     if not (opts.dry_run or _image_exists("aider-benchmark")):

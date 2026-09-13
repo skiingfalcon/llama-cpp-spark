@@ -14,18 +14,18 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from rich.console import Console
 from rich.table import Table
 
 from spark_llm.config import Settings, get_settings
+from spark_llm.console import err
+from spark_llm.console import out as console
 from spark_llm.gpu import busy_reasons
 from spark_llm.platforms import current as current_platform
 from spark_llm.provenance import Provenance, collect
 from spark_llm.registry import Defaults, ModelKind, ModelSpec, load_registry
 from spark_llm.server import RuntimeParams, merge_runtime, runtime_env
-
-console = Console()
 
 
 @dataclass
@@ -113,7 +113,7 @@ def bench_argv(
     if spec.kind is ModelKind.embedding:
         argv.extend(["-embd", "1"])
     if spec.kind is ModelKind.multimodal and spec.mmproj:
-        console.print("[yellow]note[/yellow] llama-bench ignores --mmproj; text path only")
+        err.print("[yellow]note[/yellow] llama-bench ignores --mmproj; text path only")
     argv.extend(opts.extra_args)
     return argv, rt, skipped
 
@@ -229,7 +229,7 @@ def print_bench_run(run: BenchRun) -> None:
     p = run.provenance
     console.print(
         f"[dim]llama.cpp {p.llama_cpp_checkout or p.llama_cpp_pinned or '?'}"
-        f"  arch={p.cuda_arch or 'unknown'}  gpu={p.gpu.get('name', '?')}"
+        f"  build={p.build_id or 'unknown'}  gpu={p.gpu.get('name', '?')}"
         f"  driver={p.gpu.get('driver_version', '?')}[/dim]"
     )
     table = Table(title="llama-bench (served configuration)")
@@ -257,6 +257,10 @@ def print_bench_run(run: BenchRun) -> None:
         console.print(f"[dim]saved {run.path}[/dim]")
 
 
+def _build(prov: dict[str, Any]) -> Any:
+    return prov.get("build_id") or prov.get("cuda_arch")  # pre-rename files say cuda_arch
+
+
 def compare_runs(a_path: Path, b_path: Path) -> Table:
     """Side-by-side t/s for matching (model, test) rows across two saved runs."""
     a = json.loads(a_path.read_text())
@@ -274,13 +278,11 @@ def compare_runs(a_path: Path, b_path: Path) -> Table:
     for col in ("model", "test", "A t/s", "B t/s", "Δ%"):
         table.add_column(col, justify="right" if "t/s" in col or col == "Δ%" else "left")
     pa, pb = a.get("provenance", {}), b.get("provenance", {})
-    if pa.get("cuda_arch") != pb.get("cuda_arch") or pa.get("llama_cpp_checkout") != pb.get(
-        "llama_cpp_checkout"
-    ):
+    if _build(pa) != _build(pb) or pa.get("llama_cpp_checkout") != pb.get("llama_cpp_checkout"):
         console.print(
             "[yellow]warning[/yellow] runs differ in build "
-            f"(A: {pa.get('llama_cpp_checkout')}/{pa.get('cuda_arch')}, "
-            f"B: {pb.get('llama_cpp_checkout')}/{pb.get('cuda_arch')})"
+            f"(A: {pa.get('llama_cpp_checkout')}/{_build(pa)}, "
+            f"B: {pb.get('llama_cpp_checkout')}/{_build(pb)})"
         )
     for key in sorted(set(ia) | set(ib)):
         va, vb = ia.get(key), ib.get(key)

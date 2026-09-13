@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from rank_bm25 import BM25Okapi
-from rich.console import Console
 
 from spark_llm.config import Settings
+from spark_llm.console import err as console
 from spark_llm.evals.config import EvalConfig, load_prompt
 from spark_llm.evals.endpoint import ChatResult, Endpoint, OpenAIEndpoint, percentile, run_parallel
 from spark_llm.evals.runs import RunRecord, RunWriter
@@ -31,11 +30,10 @@ from spark_llm.evals.sec.questions import (
     questions_for_filing,
     score_numeric,
 )
+from spark_llm.evals.serving import endpoint_for, openai_endpoint_for
 from spark_llm.provenance import collect
-from spark_llm.registry import Registry, load_registry
+from spark_llm.registry import load_registry
 from spark_llm.server import merge_runtime
-
-console = Console(stderr=True)
 
 TASKS = ("extract-full", "extract-chunked", "qa-financebench", "summarise-mdna")
 PROMPT_OVERHEAD_TOKENS = 256  # system prompt + template scaffolding, conservative
@@ -55,36 +53,6 @@ class SecRunOptions:
     context_window: int | None = None
     max_tokens: int | None = None  # override evals.toml [quality].max_tokens
     reasoning_effort: str | None = None  # override evals.toml [quality].reasoning_effort
-
-
-def endpoint_for(
-    settings: Settings, registry: Registry, model: str, host: str, port: int | None
-) -> Endpoint:
-    spec = registry.get(model)
-    listen = port or spec.port or settings.base_port
-    ep = Endpoint(host, listen, model=model, timeout_s=settings.eval_timeout_s)
-    if not ep.healthy():
-        raise RuntimeError(
-            f"{model} is not serving on {host}:{listen}; run: local-llm serve {model}"
-        )
-    return ep
-
-
-def openai_endpoint_for(settings: Settings, model: str, context_window: int | None) -> Endpoint:
-    api_key = os.environ.get("OPENAI_API_KEY") or settings.openai_api_key or ""
-    base_url = os.environ.get("OPENAI_BASE_URL", settings.openai_base_url)
-    ep = OpenAIEndpoint(
-        api_key,
-        model,
-        base_url=base_url,
-        context_window=context_window or settings.openai_context_window,
-    )
-    if not ep.healthy():
-        ep.close()
-        raise RuntimeError(
-            "OpenAI API preflight failed; check OPENAI_API_KEY, OPENAI_BASE_URL, and model access"
-        )
-    return ep
 
 
 class Judge:
@@ -162,10 +130,6 @@ def _filter(filings: list[Filing], opts: SecRunOptions) -> list[Filing]:
     if opts.forms:
         out = [f for f in out if f.form in opts.forms]
     return out
-
-
-def _timing(r: ChatResult) -> dict[str, Any]:
-    return r.as_dict()
 
 
 def summarise(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -409,7 +373,7 @@ def run_extract(
                 "reason": f"http {r.status}",
                 "error": r.error,
                 "correct": None,
-                **_timing(r),
+                **r.as_dict(),
             }
             writer.write(rec)
             return rec
@@ -423,7 +387,7 @@ def run_extract(
             "off_by_scale": s.off_by_scale,
             "rel_error": s.rel_error,
             "skipped": False,
-            **_timing(r),
+            **r.as_dict(),
         }
         writer.write(rec)
         if s.correct:
@@ -482,7 +446,7 @@ def run_financebench(
                 "reason": f"http {r.status}",
                 "error": r.error,
                 "correct": None,
-                **_timing(r),
+                **r.as_dict(),
             }
             writer.write(rec)
             return rec
@@ -505,7 +469,7 @@ def run_financebench(
             "correct": correct,
             "method": method,
             "skipped": False,
-            **_timing(r),
+            **r.as_dict(),
         }
         writer.write(rec)
         return rec
@@ -554,7 +518,7 @@ def run_summary(
                 "reason": f"http {r.status}",
                 "error": r.error,
                 "correct": None,
-                **_timing(r),
+                **r.as_dict(),
             }
             writer.write(rec)
             return rec
@@ -572,7 +536,7 @@ def run_summary(
             "score": mean,
             "correct": (mean is not None and mean >= 0.8) if mean is not None else None,
             "skipped": False,
-            **_timing(r),
+            **r.as_dict(),
         }
         writer.write(rec)
         return rec
@@ -585,6 +549,8 @@ def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOp
         raise ValueError(f"unknown task {opts.task!r}; choose from {', '.join(TASKS)}")
     if opts.provider not in {"local", "openai"}:
         raise ValueError("provider must be 'local' or 'openai'")
+    if opts.task == "qa-financebench" and not cfg.sec.financebench.enabled:
+        raise ValueError("qa-financebench is disabled in evals.toml ([sec.financebench] enabled)")
     cfg = apply_quality_overrides(cfg, opts)
     registry = load_registry(settings=settings)
     if opts.provider == "openai":

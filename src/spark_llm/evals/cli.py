@@ -5,18 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
 from spark_llm.config import get_settings
+from spark_llm.console import err
+from spark_llm.console import out as console
 from spark_llm.evals.config import load_eval_config
 from spark_llm.evals.report import build_report, latest_runs, write_report
 from spark_llm.evals.sec.perf import PerfOptions, run_sec_perf
-from spark_llm.evals.sec.run import TASKS, SecRunOptions, endpoint_for, run_sec_task
+from spark_llm.evals.sec.run import TASKS, SecRunOptions, run_sec_task
+from spark_llm.evals.serving import endpoint_for
 from spark_llm.evals.swe.check import tool_call_check
 from spark_llm.evals.swe.run import SweRunOptions, run_swe
 from spark_llm.registry import load_registry
 
-console = Console()
 eval_app = typer.Typer(
     help="Workload evals against a running llama-server (SEC filings, SWE benchmarks).",
     no_args_is_help=True,
@@ -53,7 +54,7 @@ def sec_fetch(
     try:
         manifest = build_corpus(settings, cfg.sec, force=force)
     except ValueError as exc:
-        console.print(f"[red]{exc}[/red]")
+        err.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
     console.print(
         f"[green]ok[/green] {len(manifest.filings)} filings for "
@@ -109,7 +110,7 @@ def sec_run(
         try:
             rec = run_sec_task(settings, cfg, model, opts)
         except (RuntimeError, FileNotFoundError, ValueError) as exc:
-            console.print(f"[red]{exc}[/red]")
+            err.print(f"[red]{exc}[/red]")
             raise typer.Exit(1) from exc
         s = rec.summary
         console.print(
@@ -141,7 +142,7 @@ def sec_perf(
     try:
         rec = run_sec_perf(settings, cfg, model, opts)
     except (RuntimeError, FileNotFoundError) as exc:
-        console.print(f"[red]{exc}[/red]")
+        err.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
     console.print(rec.summary.get("by_length"))
     console.print(rec.summary.get("concurrency"))
@@ -159,7 +160,7 @@ def swe_check(
     try:
         ep = endpoint_for(settings, registry, model, host or settings.eval_host, port)
     except RuntimeError as exc:
-        console.print(f"[red]{exc}[/red]")
+        err.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
     result = tool_call_check(ep)
     for label, probe in result["probes"].items():
@@ -201,7 +202,7 @@ def swe_run(
     try:
         rec = run_swe(settings, cfg, model, opts)
     except (RuntimeError, FileNotFoundError) as exc:
-        console.print(f"[red]{exc}[/red]")
+        err.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
     console.print(f"[bold]{model}[/bold] tier{tier}: {rec.summary}")
 
@@ -216,7 +217,7 @@ def report(
     settings = get_settings()
     run_dirs = runs or latest_runs(settings, suite, _csv(models) or None)
     if not run_dirs:
-        console.print(f"[yellow]no finished runs for suite {suite!r}[/yellow]")
+        err.print(f"[yellow]no finished runs for suite {suite!r}[/yellow]")
         raise typer.Exit(1)
     table, md = build_report(run_dirs)
     console.print(table)

@@ -4,6 +4,9 @@ Numbers without this block are not comparable across rebuilds: build.sh can sile
 back from ``121a-real`` to ``121 + GGML_NATIVE=OFF``, which changes prompt-processing speed.
 With two machines in play the block also names the platform (spark / halo), the GPU backend
 (cuda / vulkan / rocm) and, for prebuilt zips, the llama.cpp release tag.
+
+Field names are platform-neutral. Files written before the rename used ``spark_llm_version`` and
+``cuda_arch``; both are still accepted on load (aliases) and re-serialised under the new names.
 """
 
 from __future__ import annotations
@@ -13,24 +16,31 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from spark_llm import __version__
 from spark_llm.config import Settings, repo_root
 from spark_llm.gpu import gpu_info
 from spark_llm.platforms import current
 
-ARCH_FILE = "spark-arch.txt"  # kept for callers; the Spark platform owns the file
+VERSION_FILE = "LLAMA_CPP_VERSION"
 
 
 class Provenance(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     timestamp: str
     hostname: str
     machine: str
-    spark_llm_version: str
+    # Version of the harness that wrote the run (was ``spark_llm_version``).
+    tool_version: str = Field(validation_alias=AliasChoices("tool_version", "spark_llm_version"))
     llama_cpp_pinned: str | None = None
     llama_cpp_checkout: str | None = None
-    cuda_arch: str | None = None  # Spark: CUDA arch; Halo: "<backend>:<tag>:<source>"
+    # What was built/installed: Spark "121a-real"; Halo "<backend>:<tag>:<source>"
+    # (was ``cuda_arch``).
+    build_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("build_id", "cuda_arch")
+    )
     binary_version: str | None = None
     gpu: dict[str, str] = Field(default_factory=dict)
     # Added for the multi-box comparison; None on runs recorded before it existed (= spark/cuda).
@@ -40,7 +50,7 @@ class Provenance(BaseModel):
 
 
 def pinned_commit() -> str | None:
-    path = repo_root() / "LLAMA_CPP_VERSION"
+    path = repo_root() / VERSION_FILE
     return path.read_text().strip() if path.is_file() else None
 
 
@@ -57,8 +67,8 @@ def checkout_commit(settings: Settings) -> str | None:
         return None
 
 
-def built_cuda_arch(settings: Settings) -> str | None:
-    """Build identity recorded by the platform's build step (Spark: scripts/build.sh arch)."""
+def build_identity(settings: Settings) -> str | None:
+    """Build identity recorded by the platform's build step (Spark: CUDA arch; Halo: zip tag)."""
     return current().build_arch(settings)
 
 
@@ -90,10 +100,10 @@ def collect(
         timestamp=datetime.now(UTC).isoformat(timespec="seconds"),
         hostname=platform.node(),
         machine=platform.machine(),
-        spark_llm_version=__version__,
+        tool_version=__version__,
         llama_cpp_pinned=pinned_commit(),
         llama_cpp_checkout=checkout_commit(settings),
-        cuda_arch=built_cuda_arch(settings),
+        build_id=build_identity(settings),
         binary_version=binary_version(binary, env) if binary else None,
         gpu=gpu_info() if with_gpu else {},
         platform=plat.name,

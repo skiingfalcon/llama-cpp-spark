@@ -5,12 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download
-from rich.console import Console
 
 from spark_llm.config import Settings, get_settings
+from spark_llm.console import err as console
 from spark_llm.registry import ModelKind, ModelSpec
-
-console = Console(stderr=True)
 
 
 def shard_base(name: str) -> str:

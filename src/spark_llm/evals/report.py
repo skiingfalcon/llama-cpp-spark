@@ -6,10 +6,11 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from pydantic import ValidationError
-from rich.console import Console
 from rich.table import Table
 
 from spark_llm.config import Settings
+from spark_llm.console import err
+from spark_llm.console import out as console
 from spark_llm.evals.runs import (
     RunRecord,
     evals_root,
@@ -18,8 +19,6 @@ from spark_llm.evals.runs import (
     load_run,
     normalise_backend,
 )
-
-console = Console()
 
 
 class LoadedRun(NamedTuple):
@@ -34,7 +33,7 @@ def _try_load(run_dir: Path) -> RunRecord | None:
         return load_run(run_dir)
     except (ValidationError, ValueError, OSError, KeyError) as exc:
         first = str(exc).splitlines()[0][:120]
-        console.print(f"[yellow]skip[/yellow] {run_dir}: {type(exc).__name__}: {first}")
+        err.print(f"[yellow]skip[/yellow] {run_dir}: {type(exc).__name__}: {first}")
         return None
 
 
@@ -104,7 +103,7 @@ def build_label(rec: RunRecord) -> str:
         return f"{provider}/api"
     prov = rec.provenance
     ident = prov.llama_cpp_release or prov.llama_cpp_checkout or prov.llama_cpp_pinned or "?"
-    return f"{ident}/{prov.cuda_arch or '?'}"
+    return f"{ident}/{prov.build_id or '?'}"
 
 
 def row_for(rec: RunRecord) -> dict[str, Any]:
@@ -165,12 +164,20 @@ def _answered(r: dict[str, Any]) -> bool:
     return not r.get("skipped") and r.get("correct") is not None
 
 
+# The "open-weights vs frontier" comparison is keyed on model-name markers. Change these (or
+# move them to evals.toml) when the models under comparison change.
+OSS_MARKER = "gpt-oss"
+FRONTIER_MARKERS = ("openai:", "terra")
+
+
 def _is_oss(model: str) -> bool:
-    return "gpt-oss" in model
+    return OSS_MARKER in model
 
 
 def _is_frontier(model: str) -> bool:
-    return model.startswith("openai:") or "terra" in model.lower()
+    return model.startswith(FRONTIER_MARKERS[0]) or any(
+        m in model.lower() for m in FRONTIER_MARKERS[1:]
+    )
 
 
 def _load_task_runs(loaded: list[LoadedRun]) -> dict[str, list[LoadedRun]]:
@@ -306,9 +313,9 @@ def comparison_blocks(loaded: list[LoadedRun]) -> tuple[list[Table], str]:
         heading = f"{task}: gpt-oss vs Terra"
         md_parts.append(f"\n### {heading}\n")
         md_parts.append(
-            "Latest finished gpt-oss-20b, gpt-oss-120b, and OpenAI/Terra runs. "
-            "`full` = whole filing in context; `section`/`chunked` = oversized-filing fallback. "
-            "Terra's 1.05M window still sees GS/STWD in full.\n"
+            "Latest finished open-weights runs and the latest hosted-API run. "
+            "`full` = whole filing in context; `section`/`chunked` = oversized-filing fallback "
+            "(local models only; the hosted model reads every filing whole).\n"
         )
         compared = ", ".join(f"{m} (`{d}`)" for m, d in zip(models, dirs, strict=True))
         md_parts.append(f"Compared: {compared}\n")
@@ -527,7 +534,7 @@ def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
     for task, hashes in hashes_by_task.items():
         if len(hashes) > 1:
             note = f"task {task}: runs use different configs ({', '.join(sorted(hashes))})"
-            console.print(f"[yellow]warning[/yellow] {note}")
+            err.print(f"[yellow]warning[/yellow] {note}")
             md.append(f"\n> warning: {note}")
     paired = paired_rows(loaded)
     if paired:

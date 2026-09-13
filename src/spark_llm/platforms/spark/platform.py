@@ -12,12 +12,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console
-
 from spark_llm.config import Settings, repo_root
+from spark_llm.console import err as console
 from spark_llm.platforms.base import BuildOptions, DoctorCheck, GpuProcess
-
-console = Console(stderr=True)
 
 ARCH_FILE = "spark-arch.txt"
 _SMI_FIELDS = [
@@ -31,6 +28,14 @@ _SMI_FIELDS = [
     "temperature.gpu",
     "power.draw",
 ]
+
+
+def _run_text(argv: list[str]) -> str:
+    """stdout of a diagnostic command, or the error text; never raises out of doctor."""
+    try:
+        return subprocess.check_output(argv, text=True, timeout=20).strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+        return f"error: {exc}"
 
 
 def _smi(args: list[str]) -> str | None:
@@ -176,7 +181,7 @@ class SparkPlatform:
         nvcc = shutil.which("nvcc")
         checks.append(DoctorCheck("nvcc", bool(nvcc), nvcc or "not found"))
         if nvcc:
-            ver = subprocess.check_output([nvcc, "--version"], text=True)
+            ver = _run_text([nvcc, "--version"])
             line = [ln for ln in ver.splitlines() if "release" in ln.lower()]
             checks.append(
                 DoctorCheck("cuda toolkit", bool(line), line[-1].strip() if line else ver.strip())
@@ -185,15 +190,10 @@ class SparkPlatform:
         smi = shutil.which("nvidia-smi")
         checks.append(DoctorCheck("nvidia-smi", bool(smi), smi or "not found"))
         if smi:
-            out = subprocess.check_output(
-                [
-                    "nvidia-smi",
-                    "--query-gpu=name,driver_version,compute_cap",
-                    "--format=csv,noheader",
-                ],
-                text=True,
-            ).strip()
-            checks.append(DoctorCheck("gpu", "GB10" in out or "12.1" in out, out))
+            out = _run_text(
+                [smi, "--query-gpu=name,driver_version,compute_cap", "--format=csv,noheader"]
+            )
+            checks.append(DoctorCheck("gpu", "GB10" in out or "12.1" in out, out or "query failed"))
             ours, foreign = split_gpu_processes(settings)
             if foreign:
                 checks.append(DoctorCheck("gpu free", False, "; ".join(p.raw for p in foreign)))
@@ -224,7 +224,7 @@ class SparkPlatform:
                     env=self.runtime_env(settings),
                 )
                 checks.append(DoctorCheck("llama-server version", True, ver.splitlines()[0][:120]))
-            except Exception as exc:  # noqa: BLE001
+            except (subprocess.CalledProcessError, OSError) as exc:
                 checks.append(DoctorCheck("llama-server version", False, str(exc)))
             arch = self.build_arch(settings)
             checks.append(

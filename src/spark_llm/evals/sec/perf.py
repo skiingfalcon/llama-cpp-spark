@@ -8,20 +8,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console
-
 from spark_llm.config import Settings
+from spark_llm.console import err as console
 from spark_llm.evals.config import EvalConfig, load_prompt
 from spark_llm.evals.endpoint import ChatResult, percentile, run_parallel
 from spark_llm.evals.runs import RunRecord, RunWriter
 from spark_llm.evals.sec.fetch import load_manifest
-from spark_llm.evals.sec.run import endpoint_for
+from spark_llm.evals.serving import endpoint_for
 from spark_llm.gpu import gpu_memory_used_mib
 from spark_llm.platforms import current as current_platform
 from spark_llm.registry import load_registry
 from spark_llm.server import merge_runtime
-
-console = Console(stderr=True)
 
 Q_COLD = "In one sentence, what is the company's principal business?"
 Q_WARM = "In one sentence, what fiscal period does this filing cover?"

@@ -117,11 +117,6 @@ def chunk_tokens(ids: list[int], size: int, overlap: int = 0) -> list[list[int]]
     return [ids[i : i + size] for i in range(0, max(len(ids), 1), step) if ids[i : i + size]]
 
 
-def chunk_chars(text: str, size: int) -> list[str]:
-    """Character-window fallback used when no tokenizer endpoint is available."""
-    return [text[i : i + size] for i in range(0, max(len(text), 1), size) if text[i : i + size]]
-
-
 _WORD = re.compile(r"[a-z0-9]+(?:'[a-z]+)?")
 
 

@@ -9,14 +9,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
-from rich.console import Console
 
 from spark_llm.config import Settings, get_settings
+from spark_llm.console import err as console
 from spark_llm.download import resolve_weights
 from spark_llm.platforms import current as current_platform
 from spark_llm.registry import Defaults, ModelKind, ModelSpec, Registry, load_registry
-
-console = Console(stderr=True)
 
 
 @dataclass
@@ -347,23 +345,3 @@ def argv_for_named_model(
     argv = build_argv(spec, registry.defaults, settings, overrides)
     port = overrides.port if overrides.port is not None else (spec.port or settings.base_port)
     return argv, port
-
-
-def ephemeral_spec_for_hf(hf: str, port: int, settings: Settings) -> ModelSpec:
-    """Build a minimal ModelSpec for an unregistered -hf reference."""
-    repo, _, quant = hf.partition(":")
-    return ModelSpec(
-        name=hf.replace("/", "_").replace(":", "_"),
-        repo=repo or None,
-        quant=quant or None,
-        kind=ModelKind.chat,
-        port=port,
-        extra_args=["--jinja"],
-    )
-
-
-def project_build_script() -> Path:
-    """The Spark's CMake build script; Halo installs prebuilt zips instead (platform.build)."""
-    from spark_llm.platforms.spark.platform import SparkPlatform
-
-    return SparkPlatform().build_script()

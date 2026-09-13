@@ -76,7 +76,7 @@ def test_from_flat_maps_summary_provenance_and_times() -> None:
     rec = RunRecord.from_flat(FLAT)
     assert rec.suite == "sec" and rec.task == "extract-full"
     assert rec.model == "gpt-oss-120b" and rec.model_label == "gpt-oss-120b-halo-rocm"
-    assert rec.provenance.cuda_arch == "rocm:lmstudio-2.37.0"
+    assert rec.provenance.build_id == "rocm:lmstudio-2.37.0"
     assert rec.provenance.platform == "halo" and rec.provenance.backend == "rocm"
     assert rec.provenance.llama_cpp_release == "2.37.0"
     assert rec.started == "2026-09-13T04:45:59+00:00"
@@ -146,3 +146,20 @@ def test_run_label_and_backend_normalisation() -> None:
     assert normalise_backend("llama.cpp-win-x86_64-vulkan-avx2") == "vulkan"
     assert normalise_backend("HIP") == "rocm" and normalise_backend("cuda13") == "cuda"
     assert normalise_backend(None) is None and normalise_backend("metal") == "metal"
+
+
+def test_run_writer_context_manager_marks_aborted_runs(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    with pytest.raises(RuntimeError):
+        with RunWriter(
+            settings, "sec", "extract-full", "m", provenance=_prov("spark", "cuda")
+        ) as w:
+            w.write({"id": "1", "correct": True, "skipped": False})
+            raise RuntimeError("boom")
+    rec = load_run(w.dir)
+    assert rec.finished is not None and rec.summary["aborted"].startswith("RuntimeError: boom")
+    assert rec.summary["n"] == 1
+    # a normal run through the context manager is untouched
+    with RunWriter(settings, "sec", "extract-full", "m2", provenance=_prov("spark", "cuda")) as w2:
+        w2.finish({"n": 0, "score": None})
+    assert "aborted" not in load_run(w2.dir).summary

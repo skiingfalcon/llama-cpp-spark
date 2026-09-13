@@ -20,7 +20,7 @@
 
 ### extract-full: gpt-oss vs Terra
 
-Latest finished gpt-oss-20b, gpt-oss-120b, and OpenAI/Terra runs. `full` = whole filing in context; `section`/`chunked` = oversized-filing fallback. Terra's 1.05M window still sees GS/STWD in full.
+Latest finished open-weights runs and the latest hosted-API run. `full` = whole filing in context; `section`/`chunked` = oversized-filing fallback (local models only; the hosted model reads every filing whole).
 
 Compared: gpt-oss-120b (`20260912T132250Z-extract-full`), gpt-oss-20b (`20260912T135023Z-extract-full`), openai:gpt-5.6-terra (`20260912T142344Z-extract-full`)
 

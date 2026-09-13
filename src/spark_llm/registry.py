@@ -92,18 +92,12 @@ class Registry(BaseModel):
             raise KeyError(f"unknown model {name!r}; known: {known}") from exc
 
 
-def _parse_models_section(raw: dict[str, Any], defaults: Defaults) -> dict[str, ModelSpec]:
+def _parse_models_section(raw: dict[str, Any]) -> dict[str, ModelSpec]:
     out: dict[str, ModelSpec] = {}
     for name, body in raw.items():
         if not isinstance(body, dict):
             raise ValueError(f"[models.{name}] must be a table, got {type(body).__name__}")
-        data = dict(body)
-        data["name"] = name
-        # Fill port from base if missing — caller can still override
-        if "port" not in data or data["port"] is None:
-            # leave None; server layer assigns
-            pass
-        out[name] = ModelSpec.model_validate(data)
+        out[name] = ModelSpec.model_validate({**body, "name": name})  # port None = server assigns
     return out
 
 
@@ -118,5 +112,5 @@ def load_registry(path: Path | None = None, settings: Settings | None = None) ->
     models_raw = data.get("models") or {}
     if not isinstance(models_raw, dict):
         raise ValueError("[models] must be a table")
-    models = _parse_models_section(models_raw, defaults)
+    models = _parse_models_section(models_raw)
     return Registry(defaults=defaults, models=models)

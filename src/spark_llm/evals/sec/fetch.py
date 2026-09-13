@@ -9,13 +9,11 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
-from rich.console import Console
 
 from spark_llm.config import Settings
+from spark_llm.console import err as console
 from spark_llm.evals.config import SecSuite
 from spark_llm.evals.sec.parse import html_to_text
-
-console = Console(stderr=True)
 
 SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 COMPANYFACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"

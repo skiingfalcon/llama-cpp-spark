@@ -12,12 +12,13 @@ from pathlib import Path
 
 import httpx
 import typer
-from rich.console import Console
 from rich.table import Table
 
 from spark_llm.bench import BenchOptions, compare_runs, print_bench_run, run_bench
-from spark_llm.client import chat_once
+from spark_llm.client import chat_once, chat_stream
 from spark_llm.config import Settings, get_settings, repo_root
+from spark_llm.console import err
+from spark_llm.console import out as console
 from spark_llm.download import download_hf_ref, download_model, resolve_weights
 from spark_llm.evals.cli import eval_app
 from spark_llm.evals.runs import BACKEND_ALIASES
@@ -40,7 +41,6 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
 )
-console = Console()
 app.add_typer(eval_app, name="eval")
 
 BACKEND_OPT = typer.Option(
@@ -173,20 +173,21 @@ def serve(
 
     if hf or model_path:
         if len(names) > 1:
-            console.print("[red]--hf / --model-path serve one model at a time[/red]")
+            err.print("[red]--hf / --model-path serve one model at a time[/red]")
             raise typer.Exit(1)
 
         # Resolve --hf via huggingface_hub; llama-server native -hf needs OpenSSL HTTPS.
         if hf:
             resolved_path = download_hf_ref(hf, settings)
             label = names[0] if names else hf.replace("/", "_").replace(":", "_")
-        else:
-            assert model_path is not None
+        elif model_path is not None:
             resolved_path = model_path
             label = names[0] if names else model_path.name
+        else:  # unreachable: guarded by `if hf or model_path`
+            raise typer.Exit(2)
 
         if not resolved_path.is_file():
-            console.print(f"[red]not found[/red] {resolved_path}")
+            err.print(f"[red]not found[/red] {resolved_path}")
             raise typer.Exit(1)
 
         overrides = ServeOverrides(
@@ -213,11 +214,11 @@ def serve(
         return
 
     if not names:
-        console.print("[red]provide a model name, or --hf / --model-path[/red]")
+        err.print("[red]provide a model name, or --hf / --model-path[/red]")
         raise typer.Exit(1)
 
     if foreground and len(names) > 1:
-        console.print("[red]--foreground only supports a single model[/red]")
+        err.print("[red]--foreground only supports a single model[/red]")
         raise typer.Exit(1)
 
     for name in names:
@@ -255,13 +256,12 @@ def chat(
     if port is None:
         reg = load_registry(settings=settings)
         port = reg.get(name).port or settings.base_port
-    result = chat_once(port, message, system=system, model=name, stream=stream)
     if stream:
-        for chunk in result:  # type: ignore[union-attr]
+        for chunk in chat_stream(port, message, system=system, model=name):
             console.print(chunk, end="")
         console.print()
     else:
-        console.print(result)
+        console.print(chat_once(port, message, system=system, model=name))
 
 
 def _int_list(raw: str) -> list[int]:
@@ -294,12 +294,12 @@ def bench(
     """
     if compare:
         if len(compare) != 2:
-            console.print("[red]--compare takes exactly two files[/red]")
+            err.print("[red]--compare takes exactly two files[/red]")
             raise typer.Exit(1)
         console.print(compare_runs(compare[0], compare[1]))
         return
     if not names:
-        console.print("[red]provide at least one registered model name[/red]")
+        err.print("[red]provide at least one registered model name[/red]")
         raise typer.Exit(1)
     settings = _with_backend(get_settings(), backend)
     opts = BenchOptions(
@@ -313,7 +313,7 @@ def bench(
     try:
         run = run_bench(names, settings, opts)
     except (FileNotFoundError, RuntimeError) as exc:
-        console.print(f"[red]{exc}[/red]")
+        err.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
     print_bench_run(run)
 
@@ -340,7 +340,7 @@ def doctor() -> None:
     console.print(f"[cyan]platform[/cyan] {plat.name} (backend {backend})")
     for c in plat.doctor_checks(settings):
         if c.note:
-            console.print(f"[yellow]note[/yellow]  {c.label}: {c.detail}")
+            err.print(f"[yellow]note[/yellow]  {c.label}: {c.detail}")
         else:
             check(c.label, c.ok, c.detail)
 
@@ -355,7 +355,7 @@ def doctor() -> None:
             try:
                 r = httpx.get(f"http://127.0.0.1:{info['port']}/health", timeout=1.0)
                 healthy = r.status_code == 200
-            except Exception:
+            except (httpx.HTTPError, OSError):
                 healthy = False
             check(f"server:{name}", healthy, f"pid={info['pid']} port={info['port']}")
 
