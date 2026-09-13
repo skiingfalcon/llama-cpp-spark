@@ -1037,8 +1037,10 @@ async function cmdReport() {
       (s.total_p95_s ?? s.total_p95)?.toFixed(2) ?? '-',
       s.prompt_tps_p50?.toFixed(0) ?? '-', s.decode_tps_p50?.toFixed(0) ?? '-',
       s.total_tokens ?? s.prompt_tokens, s.cached_prompt_tokens ?? 'n/a', s.reasoning_chars,
-      ctxOf(run), `${p.backend}/${run.server?.runtime_version ?? run.runtime_version ?? '?'}`,
-      `${p.platform}/${run.server?.served_via ?? run.served_via}`, s.fallback ? `fallback ${s.fallback}` : '-',
+      ctxOf(run),
+      `${p.backend ?? 'api'}/${run.server?.runtime_version ?? run.runtime_version ?? p.llama_cpp_release ?? p.llama_cpp_checkout ?? '?'}`,
+      `${p.platform ?? (run.server?.provider ? 'api' : 'spark')}/${run.server?.served_via ?? run.served_via ?? (run.server?.provider ?? 'llama-server')}`,
+      s.fallback ? `fallback ${s.fallback}` : '-',
     ]));
   }
 
