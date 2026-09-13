@@ -243,6 +243,41 @@ Ollama is the closest alternative and also wraps llama.cpp, but it hides the ser
 comparison depends on and keeps its own model store. vLLM is not an option here: no Windows
 build, and its ROCm support for gfx1151 is immature.
 
+### Locked-down machines: LM Studio extract-full workaround
+
+Some Halo (or other) boxes are locked down: no Python, no compiler, no admin rights to install
+`uv` / Visual Studio Build Tools, and only a browser-installable app like **LM Studio** is
+allowed. In that case you cannot run `local-llm serve` or the Python SEC harness, but you can
+still run a comparable **extract-full** accuracy check against LM Studio's OpenAI-compatible
+endpoint with the single Node script checked in here:
+
+[`scripts/lmstudio.mjs`](scripts/lmstudio.mjs) — Node 18+ only, no npm dependencies. It mirrors
+the harness corpus (same 12 tickers, 1×10-K + 3×10-Q), XBRL ground truth, prompts, free-text
+scoring, and full → section → BM25 top-k context degradation.
+
+```powershell
+# On the locked-down box (PowerShell). Node from nodejs.org is enough.
+$env:EDGAR_UA = "local-llm you@example.com"   # SEC fair-access User-Agent
+# Load a model in LM Studio, start the local server (default http://127.0.0.1:1234)
+node scripts/lmstudio.mjs fetch
+node scripts/lmstudio.mjs run --forms 10-K    # overnight for 120b; --limit N to smoke-test
+node scripts/lmstudio.mjs report
+```
+
+Optional: `$env:LMS_URL`, `$env:LMS_MODEL`, `$env:LMS_TOKEN`, `--ticker`, `--tag`,
+`--reasoning-effort low`, `--insecure` (corporate TLS inspection).
+
+**What matches the Python harness:** companies, forms, tags/aliases/`accept_aliases`, question
+wording with period-end dates, prompts, `parse_number` scoring (0.5% tolerance + off-by-scale),
+and the context-degradation policy. Results land under `state/evals/<model>/<timestamp>-extract-full/`
+with `served_via: lmstudio` so they stay distinguishable from Spark/`local-llm` runs.
+
+**What does not:** token counts are `chars/4.6` estimates (LM Studio has no `/tokenize`), so
+full vs section vs chunked boundaries can differ slightly; the backend is LM Studio's bundled
+runtime, not the pinned `LLAMA_CPP_RELEASE`; cached-prompt and exact prefill/decode columns are
+indicative only. Use this for an accuracy signal on a locked box, not as a drop-in replacement
+for the Spark hardware comparison. Prefer `local-llm eval sec …` whenever Python is available.
+
 ### Known gaps on Halo
 
 - No per-process GPU memory accounting; `perf` records **unified memory in use** instead, which

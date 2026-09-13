@@ -22,7 +22,7 @@
  *   --reasoning-effort   low|medium|high (default: unset, matches evals.toml)
  *
  * Known gaps vs the Python harness (not fixable without a tokenizer endpoint):
- *   - Token counts are chars/3.6 estimates; mode boundaries can differ slightly.
+ *   - Token counts are chars/4.6 estimates; mode boundaries can differ slightly.
  *   - Backend is LM Studio's runtime, not the pinned llama.cpp build; perf
  *     columns are indicative only; cached prompt tokens are unavailable.
  *
@@ -144,7 +144,7 @@ const TAGS = [
 const TOLERANCE = 0.005;          // 0.5% relative, matches evals.toml
 const MAX_TOKENS = 4096;
 const SEED = 42;
-const CHARS_PER_TOKEN = 3.6;      // approximation; LM Studio has no tokenize endpoint
+const CHARS_PER_TOKEN = 4.6;      // approximation; LM Studio has no tokenize endpoint
 const CHUNK_TOKENS = 8000;        // evals.toml sec.chunk_tokens
 const CHUNK_CHARS = Math.round(CHUNK_TOKENS * CHARS_PER_TOKEN);
 const TOP_K = 6;                  // evals.toml sec.top_k
@@ -638,6 +638,7 @@ function lmsStream(model, messages, onFirstToken) {
     seed: SEED,
     max_tokens: MAX_TOKENS,
     stream: true,
+    stream_options: { include_usage: true },
   };
   if (REASONING_EFFORT && REASONING_EFFORT !== true) {
     body.reasoning_effort = REASONING_EFFORT;
@@ -912,11 +913,9 @@ async function cmdRun() {
       const t0 = Date.now();
       let resp;
       try {
-        process.stdout.write(`  ${q.id.padEnd(58)} ... prefill`);
         resp = await lmsStream(model, messages, (ttft) => {
-          process.stdout.write(`\r  ${q.id.padEnd(58)} ... ${ttft.toFixed(1)}s to first token, decoding`);
+          console.log(`  ${q.id.padEnd(58)} first token after ${ttft.toFixed(1)}s`);
         });
-        process.stdout.write('\r' + ' '.repeat(110) + '\r');
       } catch (err) {
         const cause = err.cause ? ` (${err.cause.code ?? err.cause.message ?? err.cause})` : '';
         console.log(`  ${q.id.padEnd(58)} ERROR ${err.message}${cause}`);
@@ -941,7 +940,8 @@ async function cmdRun() {
       if (stats.time_to_first_token != null) ttfts.push(stats.time_to_first_token);
       totals.push(wall);
       if (stats.tokens_per_second != null) decodeTps.push(stats.tokens_per_second);
-      const pTok = resp.usage?.prompt_tokens ?? 0;
+      const pTok = resp.usage?.prompt_tokens
+        || estTokens(messages.map((m) => m.content).join('\n'));
       promptTokens += pTok;
       const prefill = stats.time_to_first_token;
       if (prefill > 0 && pTok) promptTps.push(pTok / prefill);
