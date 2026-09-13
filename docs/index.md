@@ -12,3 +12,6 @@ all committed runs is [`state/evals/report-sec.md`](../state/evals/report-sec.md
 (`uv run local-llm eval report --suite sec` regenerates it).
 
 `inference-stack-spark-vs-halo.png` is a binary export; there is no diagram source in the repo.
+
+Posts and write-ups published outside the repo, with links and the feedback they drew, are
+logged in [`posts/README.md`](posts/README.md).

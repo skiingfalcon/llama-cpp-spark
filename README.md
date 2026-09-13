@@ -522,6 +522,7 @@ llama-cpp-spark/
   scripts/lmstudio.mjs # Node: extract-full via LM Studio for locked-down boxes
   scripts/migrate_runs.py  # canonicalise committed run.json files (idempotent)
   docs/                # eval reports (see docs/index.md) and the stack diagram
+  docs/posts/          # drafts and log of everything published outside the repo
   src/spark_llm/       # CLI + argv merge + download + bench (shared)
   src/spark_llm/platforms/spark/  # Linux/CUDA: process control, nvidia-smi, build.sh, doctor
   src/spark_llm/platforms/halo/   # Windows/AMD: zip installer, taskkill/CIM, doctor
