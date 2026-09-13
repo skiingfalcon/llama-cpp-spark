@@ -1,7 +1,7 @@
 {
   "task": "extract-full",
   "model": "openai/gpt-oss-120b",
-  "model_label": "gpt-oss-120b",
+  "model_label": "gpt-oss-120b-halo-rocm",
   "platform": "halo",
   "backend": "llama.cpp-win-x86_64-amd-rocm-avx2",
   "runtime_version": "2.37.0",

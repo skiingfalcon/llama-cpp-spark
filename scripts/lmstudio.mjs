@@ -155,7 +155,8 @@ const SYSTEM_PROMPT =
 
 const STATE = path.join(ROOT, 'state');
 const FILINGS = path.join(STATE, 'filings');
-const EVALS = path.join(STATE, 'evals');
+// Same suite tree as the Python harness: state/evals/sec/<model-or-stack>/...
+const EVALS = path.join(STATE, 'evals', 'sec');
 
 const argv = process.argv.slice(2);
 const CMD = argv[0];
@@ -826,7 +827,14 @@ async function cmdRun() {
   if (!model) throw new Error('No loaded LLM found. Load a model in LM Studio first.');
   const ctx = loaded?.loaded_context_length ?? loaded?.max_context_length ?? 32768;
 
-  const modelLabel = model.split('/').pop();
+  let runtimeInfo = await lmsProbe(model);
+  const runtimeName = (runtimeInfo?.runtime?.name ?? '').toLowerCase();
+  let backendTag = 'lmstudio';
+  if (runtimeName.includes('vulkan')) backendTag = 'vulkan';
+  else if (runtimeName.includes('rocm') || runtimeName.includes('hip')) backendTag = 'rocm';
+  else if (runtimeName.includes('cuda')) backendTag = 'cuda';
+
+  const modelLabel = `${model.split('/').pop()}-halo-${backendTag}`;
   const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, 'Z');
   const outDir = path.join(EVALS, modelLabel, `${ts}-extract-full`);
   await mkdir(outDir, { recursive: true });
@@ -845,7 +853,6 @@ async function cmdRun() {
   }
   console.log();
 
-  let runtimeInfo = await lmsProbe(model);
   if (runtimeInfo?.runtime) {
     console.log(`backend ${runtimeInfo.runtime.name} v${runtimeInfo.runtime.version}\n`);
   }
@@ -1033,7 +1040,7 @@ async function cmdReport() {
   for (const modelDir of await readdir(EVALS)) {
     const modelPath = path.join(EVALS, modelDir);
     if (!(await stat(modelPath)).isDirectory()) continue;
-    // Skip the Python harness tree (state/evals/sec/...).
+    // Skip non-run trees if someone points EVALS at state/evals instead of …/sec.
     if (modelDir === 'sec') continue;
     const dirs = (await readdir(modelPath)).sort();
     for (const d of dirs) {

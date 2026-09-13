@@ -255,8 +255,9 @@ Optional: `$env:LMS_URL`, `$env:LMS_MODEL`, `$env:LMS_TOKEN`, `--ticker`, `--tag
 
 **What matches the Python harness:** companies, forms, tags/aliases/`accept_aliases`, question
 wording with period-end dates, prompts, `parse_number` scoring (0.5% tolerance + off-by-scale),
-and the context-degradation policy. Results land under `state/evals/<model>/<timestamp>-extract-full/`
-with `served_via: lmstudio` so they stay distinguishable from Spark/`local-llm` runs.
+and the context-degradation policy. Results land under
+`state/evals/sec/<model>-halo-<vulkan|rocm>/<timestamp>-extract-full/` with
+`served_via: lmstudio`, next to the Spark and Terra runs in the same `sec/` tree.
 
 **What does not:** token counts are `chars/4.6` estimates (LM Studio has no `/tokenize`), so
 full vs section vs chunked boundaries can differ slightly; the backend is LM Studio's bundled
@@ -264,9 +265,12 @@ runtime, not the pinned `LLAMA_CPP_RELEASE`; cached-prompt and exact prefill/dec
 indicative only. Use this for an accuracy signal on a locked box, not as a drop-in replacement
 for the Spark hardware comparison. Prefer `local-llm eval sec …` whenever Python is available.
 
-**Results (September 2026):** on the same 121-question 10-K suite as the Spark re-run,
-`gpt-oss-120b` scored **117/121 (96.7%)** on AMD Strix Halo (Vulkan) and **115/121 (95.0%)**
-on AMD Strix Halo (ROCm), vs **119/121 (98.3%)** on NVIDIA DGX Spark (CUDA). Full write-up:
+**Results (September 2026):** on the same 121-question 10-K suite,
+**OpenAI hosted (`gpt-5.6-terra`)** scored **120/121 (99.2%)**, **NVIDIA DGX Spark (CUDA)**
+**119/121 (98.3%)**, **AMD Strix Halo (Vulkan)** **117/121 (96.7%)**, and **AMD Strix Halo
+(ROCm)** **115/121 (95.0%)**. Raw artifacts live under `state/evals/sec/` next to the Spark
+and Terra runs (`gpt-oss-120b`, `gpt-oss-120b-halo-vulkan`, `gpt-oss-120b-halo-rocm`,
+`openai_gpt-5.6-terra`). Full write-up:
 [docs/eval-report-2026-09-halo.md](docs/eval-report-2026-09-halo.md) (see also
 [eval-report-2026-09-rerun.md](docs/eval-report-2026-09-rerun.md) and
 [eval-report-2026-09.md](docs/eval-report-2026-09.md)).
