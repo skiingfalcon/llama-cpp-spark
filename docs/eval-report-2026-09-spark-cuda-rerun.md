@@ -1,7 +1,7 @@
 # SEC 10-K extraction eval — September 2026 re-run (post-fix)
 
 Re-run of the three-model comparison after the harness fixes documented in
-[the first report](eval-report-2026-09.md#what-changed-since-this-run). Keep both documents:
+[the first report](eval-report-2026-09-spark-cuda.md#what-changed-since-this-run). Keep both documents:
 the first report holds the pre-fix raw numbers (96-question paired set, 512-token budget,
 skips), this one holds the post-fix numbers (121 questions, 4096-token budget, per-filing
 fallback). Cross-checking the two shows exactly what each fix bought.
@@ -232,7 +232,7 @@ To repeat this on the AMD Strix Halo box (Windows), follow the README section
 [Windows / AMD Strix Halo](../README.md#windows--amd-strix-halo); the eval commands are the
 same and the report adds a Hardware block comparing the two machines. Locked-down hosts that
 can only run LM Studio should use [`scripts/lmstudio.mjs`](../scripts/lmstudio.mjs) and see
-[eval-report-2026-09-halo.md](eval-report-2026-09-halo.md).
+[eval-report-2026-09-spark-halo-terra.md](eval-report-2026-09-spark-halo-terra.md).
 
 ## Bottom line for the team
 

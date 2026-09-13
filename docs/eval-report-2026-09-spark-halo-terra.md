@@ -1,6 +1,6 @@
 # SEC 10-K extraction — AMD Strix Halo vs NVIDIA DGX Spark vs hosted Terra (September 2026)
 
-Same 121-question `extract-full` suite as the [Spark re-run](eval-report-2026-09-rerun.md).
+Same 121-question `extract-full` suite as the [Spark re-run](eval-report-2026-09-spark-cuda-rerun.md).
 Local stacks run `gpt-oss-120b` MXFP4; the hosted column is OpenAI **`gpt-5.6-terra`**.
 The AMD Strix Halo box was locked down (no Python / `uv` / compiler), so those numbers come
 from [`scripts/lmstudio.mjs`](../scripts/lmstudio.mjs) against LM Studio instead of
@@ -128,7 +128,7 @@ elsewhere (HD shares).
 
 - **GS operating cash flow**: Spark answered +17.0B (parent-only condensed statement in the
   notes); AMD and Terra answered −45.154B (consolidated). Documented in the
-  [re-run report](eval-report-2026-09-rerun.md#every-remaining-miss-itemized).
+  [re-run report](eval-report-2026-09-spark-cuda-rerun.md#every-remaining-miss-itemized).
 - **CAT `LongTermDebtNoncurrent`**: Spark answered 50.7B (incl. Financial Products);
   AMD and Terra answered 30.7B (machinery-only, matching XBRL).
 
@@ -216,7 +216,7 @@ node scripts/lmstudio.mjs run --forms 10-K
 node scripts/lmstudio.mjs report
 ```
 
-Spark / Terra reproduction: [eval-report-2026-09-rerun.md](eval-report-2026-09-rerun.md).
+Spark / Terra reproduction: [eval-report-2026-09-spark-cuda-rerun.md](eval-report-2026-09-spark-cuda-rerun.md).
 Unlocked Halo: [Windows / AMD Strix Halo](../README.md#windows--amd-strix-halo).
 
 ## Bottom line for the team

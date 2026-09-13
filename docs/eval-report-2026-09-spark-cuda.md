@@ -2,7 +2,7 @@
 
 > **Superseded:** these are the pre-fix raw numbers, kept for cross-checking. The post-fix
 > re-run (max_tokens 4096, ground-truth alias fixes, per-filing fallback, no rate-limit
-> losses) is in [eval-report-2026-09-rerun.md](eval-report-2026-09-rerun.md).
+> losses) is in [eval-report-2026-09-spark-cuda-rerun.md](eval-report-2026-09-spark-cuda-rerun.md).
 
 Comparison of three models on the same pinned SEC extraction workload, run on the
 DGX Spark (GB10) and against the OpenAI API.
@@ -26,7 +26,7 @@ flowchart LR
   oss --> artifacts["state/evals/sec/..."]
   terra --> artifacts
   artifacts --> report["report-sec.md"]
-  artifacts --> analysis["docs/eval-report-2026-09.md"]
+  artifacts --> analysis["docs/eval-report-2026-09-spark-cuda.md"]
 ```
 
 ## Setup

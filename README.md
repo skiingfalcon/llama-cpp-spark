@@ -30,7 +30,8 @@ Three ways the same `gpt-oss-120b` MXFP4 weights get served in this project:
 - **AMD Strix Halo via LM Studio** — locked-down hosts that cannot install `uv` / a compiler
   still run the extract-full suite through [`scripts/lmstudio.mjs`](scripts/lmstudio.mjs)
   against LM Studio's bundled llama.cpp. See the
-  [Halo eval report](docs/eval-report-2026-09-halo.md) for the September 2026 numbers.
+  [Spark / Halo / Terra eval report](docs/eval-report-2026-09-spark-halo-terra.md) for the
+  September 2026 numbers.
 
 ## Requirements
 
@@ -271,9 +272,9 @@ for the Spark hardware comparison. Prefer `local-llm eval sec …` whenever Pyth
 (ROCm)** **115/121 (95.0%)**. Raw artifacts live under `state/evals/sec/` next to the Spark
 and Terra runs (`gpt-oss-120b-spark-cuda`, `gpt-oss-20b-spark-cuda`,
 `gpt-oss-120b-halo-vulkan`, `gpt-oss-120b-halo-rocm`, `openai_gpt-5.6-terra`). Full write-up:
-[docs/eval-report-2026-09-halo.md](docs/eval-report-2026-09-halo.md) (see also
-[eval-report-2026-09-rerun.md](docs/eval-report-2026-09-rerun.md) and
-[eval-report-2026-09.md](docs/eval-report-2026-09.md)).
+[docs/eval-report-2026-09-spark-halo-terra.md](docs/eval-report-2026-09-spark-halo-terra.md) (see also
+[eval-report-2026-09-spark-cuda-rerun.md](docs/eval-report-2026-09-spark-cuda-rerun.md) and
+[eval-report-2026-09-spark-cuda.md](docs/eval-report-2026-09-spark-cuda.md)).
 
 ### Known gaps on Halo
 
