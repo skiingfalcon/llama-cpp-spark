@@ -195,6 +195,29 @@ lead is real but narrow, and comes with API cost and data egress.
 
 ## Caveats
 
+> **Review notes (2026-09-13), added after a critical read of these results.** Each item is a
+> limitation of what the tables above can support; the fixes that already exist are named.
+>
+> 1. **One run per stack, 121 items.** A two-question gap (119 vs 117 of 121) is inside the
+>    sampling noise. Bootstrap 95% intervals are now computed per run in
+>    [`state/evals/report-sec.md`](../state/evals/report-sec.md); the intervals for the Spark,
+>    the Halo (Vulkan) and Terra overlap. Read "ties" as "not distinguishable at this sample
+>    size", not as parity.
+> 2. **No memorisation control yet.** All models were trained on public SEC filings and XBRL
+>    facts, so some answers may be recall rather than reading. A control exists
+>    (`local-llm eval sec run <model> --task extract-full --forms 10-K --no-document`) and has
+>    not been run; until it is, the "reads the filing" framing is unproven.
+> 3. **Halo prompt-throughput figures were artefacts.** LM Studio's per-request stats cannot
+>    yield a prefill tokens/s; the report now blanks that column for LM Studio-served runs.
+>    Decode t/s and wall clock are unaffected.
+> 4. **Unequal context.** Terra read every filing whole at 1.05M context; local stacks read the
+>    two oversized filings from an excerpt. The 104-item full-document slice is the fair one.
+> 5. **Ground truth changed between the first Spark run and these runs** (alias rules, the
+>    revenue label). Runs now record `scoring_version` and hash full tag definitions so this
+>    cannot happen silently again; the earlier runs pre-date that stamp.
+> 6. **Zero marginal cost is not zero cost.** Power, the boxes and the engineering time are
+>    not in the table.
+
 1. **Vendor / path labels.** Tables always say **OpenAI hosted (Terra)**, **NVIDIA DGX Spark
    (CUDA)**, **AMD Strix Halo (Vulkan|ROCm)** — never bare backend names.
 2. **Not an apples-to-apples engine bake-off** between Spark and Halo (pinned llama.cpp vs

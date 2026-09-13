@@ -3,7 +3,7 @@
 **Venue:** r/LocalLLaMA (Reddit)
 **Audience:** people running open-weight models on their own hardware; many Spark and Strix Halo owners
 **Source of numbers:** `docs/eval-report-2026-09-spark-halo-terra.md`, `docs/eval-report-2026-09-spark-cuda-rerun.md`, `state/evals/sec/*`
-**Status:** draft
+**Status:** draft — do not post until the `--no-document` memorisation control has been run on the Spark and its result added below. Intervals are in.
 
 ---
 
@@ -27,7 +27,8 @@ Same model file (`gpt-oss-120b-MXFP4.gguf`), same prompts, same sampling (temp 0
 **What I took from it**
 
 - On every filing that fits in context, the Spark, the Halo on Vulkan, and the frontier model
-  score the same: 103 of 104. The frontier model's edge is reading the two oversized filings whole.
+  are not distinguishable: 103 of 104 each, with overlapping bootstrap intervals (single run,
+  n = 121; see the repo report). The frontier model's edge is reading the two oversized filings whole.
 - Decode speed is basically identical on the two boxes (bandwidth-bound; both are around 256 to
   273 GB/s). The 3x wall-clock gap is entirely prefill, which is compute-bound, and the GB10 has a
   lot more of it. Once a filing is cached, follow-up questions cost about the same on both.
@@ -39,6 +40,11 @@ Same model file (`gpt-oss-120b-MXFP4.gguf`), same prompts, same sampling (temp 0
   wrong ground truth (XBRL alias choices). The pre-fix and post-fix reports are both in the repo.
 
 **Caveats, so you do not have to find them**
+
+- Single run per stack. Bootstrap 95% intervals on the 121-question accuracy: Terra 0.98–1.00,
+  Spark 0.96–1.00, Halo Vulkan 0.93–0.99, Halo ROCm 0.91–0.98. They overlap, so no ranking
+  among the top three is claimed. Memorisation control (same questions, no document):
+  _fill in result before posting_.
 
 - The Halo box is locked down (no Python, no compiler), so its runs went through LM Studio
   2.37's bundled llama.cpp via a Node script, not the pinned build the Spark uses. Treat the

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -57,6 +58,7 @@ COLUMNS = [
     ("task", "task"),
     ("n", "n"),
     ("score", "score"),
+    ("95% CI", "ci95"),
     ("skipped", "skipped"),
     ("truncated", "truncated"),
     ("ttft p50 s", "ttft_p50_s"),
@@ -71,6 +73,44 @@ COLUMNS = [
     ("platform", "platform"),
     ("note", "note"),
 ]
+
+
+MIN_CI_N = 5
+BOOTSTRAP_RESAMPLES = 2000
+
+
+def bootstrap_ci(
+    flags: list[bool], resamples: int = BOOTSTRAP_RESAMPLES, seed: int = 0
+) -> tuple[float, float] | None:
+    """95% percentile-bootstrap interval for an accuracy over per-item verdicts.
+
+    One run of 121 items cannot separate 98.3% from 96.7%; the interval makes that visible in
+    the table instead of leaving it to the reader. None when there are too few items to mean
+    anything.
+    """
+    n = len(flags)
+    if n < MIN_CI_N:
+        return None
+    rng = random.Random(seed)
+    hits = [1 if f else 0 for f in flags]
+    means = sorted(sum(rng.choice(hits) for _ in range(n)) / n for _ in range(resamples))
+    return means[int(0.025 * resamples)], means[int(0.975 * resamples) - 1]
+
+
+def ci_text(flags: list[bool]) -> str | None:
+    ci = bootstrap_ci(flags)
+    return None if ci is None else f"{ci[0]:.2f}–{ci[1]:.2f}"
+
+
+def _verdicts(results: dict[str, dict[str, Any]], ids: set[str] | None = None) -> list[bool]:
+    return [
+        bool(r["correct"]) for i, r in results.items() if _answered(r) and (ids is None or i in ids)
+    ]
+
+
+def tps_reliable(rec: RunRecord) -> bool:
+    """LM Studio's per-request stats cannot yield a prompt-throughput figure we trust."""
+    return rec.server.get("served_via") != "lmstudio"
 
 
 def _fmt(v: Any) -> str:
@@ -115,17 +155,20 @@ def row_for(rec: RunRecord) -> dict[str, Any]:
         "task": rec.task,
         "n": s.get("n", rec.n_results),
         "score": s.get("score"),
+        "ci95": None,  # filled by build_report from per-item results
         "skipped": s.get("skipped", 0),
         "truncated": s.get("truncated"),
         "ttft_p50_s": s.get("ttft_p50_s"),
         "total_p50_s": s.get("total_p50_s"),
-        "prompt_tps_p50": s.get("prompt_tps_p50"),
+        "prompt_tps_p50": s.get("prompt_tps_p50") if tps_reliable(rec) else None,
         "decode_tps_p50": s.get("decode_tps_p50"),
         "total_tokens": s.get("total_tokens"),
         "cached_prompt_tokens": s.get("cached_prompt_tokens"),
         "reasoning_tokens": s.get("reasoning_tokens"),
         "n_ctx": rec.server.get("n_ctx_per_slot"),
-        "note": s.get("note") or s.get("aborted"),
+        "note": s.get("note")
+        or s.get("aborted")
+        or (None if tps_reliable(rec) else "LM Studio stats; prompt t/s not measurable"),
         "build": build,
         "config_hash": rec.config_hash,
         "run_dir": None,
@@ -157,6 +200,7 @@ PAIRED_COLUMNS = [
     ("paired n", "n"),
     ("correct", "correct"),
     ("paired score", "score"),
+    ("95% CI", "ci95"),
 ]
 
 
@@ -210,6 +254,7 @@ def paired_rows(loaded: list[LoadedRun]) -> list[dict[str, Any]]:
                     "n": len(common),
                     "correct": correct,
                     "score": correct / len(common) if common else None,
+                    "ci95": ci_text(_verdicts(results, common)),
                 }
             )
     rows.sort(key=lambda r: (r["task"], -(r["score"] or 0)))
@@ -415,6 +460,7 @@ def comparison_blocks(loaded: list[LoadedRun]) -> tuple[list[Table], str]:
 HARDWARE_COLUMNS = [
     ("platform", "platform"),
     ("score", "score"),
+    ("95% CI", "ci95"),
     ("paired", "paired"),
     ("truncated", "truncated"),
     ("ttft p50 s", "ttft_p50_s"),
@@ -439,12 +485,13 @@ def _accuracy_hardware_rows(runs: list[LoadedRun]) -> list[dict[str, Any]]:
             {
                 "platform": platform_label(rec),
                 "score": s.get("score"),
+                "ci95": ci_text(_verdicts(results)),
                 "paired": _frac(c, n),
                 "truncated": s.get("truncated"),
                 "ttft_p50_s": s.get("ttft_p50_s"),
                 "total_p50_s": s.get("total_p50_s"),
                 "total_p95_s": s.get("total_p95_s"),
-                "prompt_tps_p50": s.get("prompt_tps_p50"),
+                "prompt_tps_p50": s.get("prompt_tps_p50") if tps_reliable(rec) else None,
                 "decode_tps_p50": s.get("decode_tps_p50"),
                 "n_ctx": rec.server.get("n_ctx_per_slot"),
                 "gpu": rec.provenance.gpu.get("name") or "-",
@@ -502,8 +549,10 @@ def hardware_blocks(loaded: list[LoadedRun]) -> tuple[list[Table], str]:
             md.append("\n## Hardware: same model, different box\n")
             md.append(
                 "Rows are (platform/backend); `paired` scores every run on the items all of them "
-                "answered. Latency includes each box's own prefill, so the "
-                "gap is the hardware gap.\n"
+                "answered; `95% CI` is a percentile bootstrap over per-item verdicts — overlapping "
+                "intervals mean the runs are not distinguishable at this sample size. Latency "
+                "includes each box's own prefill, so the gap is the hardware gap. Prompt t/s is "
+                "blank for LM Studio-served runs (not measurable from its stats).\n"
             )
         tables.append(_rich_table(f"hardware: {title}", cols, rows))
         md.append(_render_md(title, cols, rows))
@@ -513,9 +562,10 @@ def hardware_blocks(loaded: list[LoadedRun]) -> tuple[list[Table], str]:
 def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
     loaded = load_runs(run_dirs)
     rows = []
-    for rec, d, _ in loaded:
+    for rec, d, results in loaded:
         row = row_for(rec)
         row["run_dir"] = str(d)
+        row["ci95"] = ci_text(_verdicts(results))
         rows.append(row)
     rows.sort(key=lambda r: (r["task"], -(r["score"] or 0)))
 

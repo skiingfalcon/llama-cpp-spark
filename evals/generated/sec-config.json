@@ -1,5 +1,6 @@
 {
   "_generated_by": "local-llm eval sec export-config (do not edit; edit evals.toml)",
+  "scoring_version": "2026-09-13.1",
   "companies": [
     {
       "ticker": "AAPL",

@@ -13,6 +13,7 @@ from typing import Any
 
 from spark_llm.config import repo_root
 from spark_llm.evals.config import EvalConfig
+from spark_llm.evals.sec.questions import SCORING_VERSION
 
 GENERATED_REL = Path("evals") / "generated" / "sec-config.json"
 
@@ -22,6 +23,7 @@ def export_sec_config(cfg: EvalConfig) -> dict[str, Any]:
     q = cfg.quality
     return {
         "_generated_by": "local-llm eval sec export-config (do not edit; edit evals.toml)",
+        "scoring_version": SCORING_VERSION,
         "companies": [{"ticker": c.ticker, "cik": c.cik} for c in cfg.sec.companies],
         "forms": dict(cfg.sec.forms),
         "tags": [

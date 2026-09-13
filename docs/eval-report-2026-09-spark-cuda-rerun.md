@@ -197,6 +197,14 @@ GS Item-8 questions, NEE Assets/Liabilities (subsidiary-level totals), HD NetInc
 
 ## Caveats
 
+> **Review notes (2026-09-13).** Single run per model; a bootstrap 95% interval per run is now
+> in [`state/evals/report-sec.md`](../state/evals/report-sec.md) and the local and hosted
+> intervals overlap, so the gap here is not statistically established. No memorisation control
+> has been run yet (`--no-document` flag exists). The `expected` values for several items
+> differ from the [first run](eval-report-2026-09-spark-cuda.md) because ground-truth alias
+> rules were changed after inspecting misses; runs now carry a `scoring_version` so that is
+> recorded going forward. "Deterministic output" has not been verified with a repeat run.
+
 1. **Latency is not a hardware bake-off.** Terra numbers include network and provider queueing.
 2. **Tokenizers differ.** GGUF tokenizer vs `o200k_base`: the same corpus sums to 10.52M vs
    12.39M prompt tokens.

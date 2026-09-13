@@ -96,6 +96,11 @@ def sec_run(
     reasoning_effort: str | None = typer.Option(
         None, "--reasoning-effort", help="low | medium | high; '' to force the model default"
     ),
+    no_document: bool = typer.Option(
+        False,
+        "--no-document",
+        help="Memorisation control: same questions, no filing in context (task <name>-nodoc)",
+    ),
 ) -> None:
     """Run a SEC task against the served model; results under state/evals/sec/."""
     settings = get_settings()
@@ -115,6 +120,7 @@ def sec_run(
             context_window=context_window,
             max_tokens=max_tokens,
             reasoning_effort=reasoning_effort,
+            no_document=no_document,
         )
         try:
             rec = run_sec_task(settings, cfg, model, opts)

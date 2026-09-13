@@ -918,7 +918,8 @@ async function cmdRun() {
   }
 
   const configHash = hash({
-    tags: TAGS.map((t) => t.tag),
+    scoring_version: CONFIG.scoring_version ?? null,
+    tags: TAGS,                       // full definitions: alias/label changes must change the hash
     tickers: COMPANIES.map((c) => c.ticker),
     forms: FORMS,
     ...decoding,
@@ -965,6 +966,8 @@ async function cmdRun() {
     },
     quality: decoding,
     task_config: {
+      scoring_version: CONFIG.scoring_version ?? null,
+      no_document: false,
       tolerance: TOLERANCE,
       chunk_tokens: CHUNK_TOKENS,
       top_k: TOP_K,

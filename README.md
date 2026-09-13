@@ -389,10 +389,31 @@ than one platform/backend, a **Hardware** block puts them side by side: paired a
 TTFT, total latency, prompt/decode throughput, context, GPU and build; for `perf` runs the
 rows are per input length.
 
+### Known limitations of the current results
+
+Read before quoting any number from this repo:
+
+- **Sample size.** One run per configuration over 121 questions. The report prints a bootstrap
+  95% interval next to every score; where intervals overlap, the runs are not distinguishable.
+  Two-question differences are noise.
+- **Memorisation.** Public filings are in every model's training data. The `--no-document`
+  control (same questions, no filing in context) exists and has not been run; until it is, the
+  results do not prove the model read the document rather than recalled the number.
+- **Ceiling.** Four stacks score 103/104 on the full-document set, so this task no longer ranks
+  models. The 10-Q, FinanceBench and SWE suites are configured and have produced no results.
+- **Ground truth was revised after the first run** (alias rules, revenue label). Runs now record
+  `scoring_version` and hash the full tag definitions so later changes cannot pass silently.
+- **Unequal context and engines.** The hosted model read every filing whole; the Halo ran a
+  different llama.cpp build through LM Studio. Only the 104-item full-document slice is a fair
+  accuracy comparison, and Halo prompt-throughput is blanked in reports because LM Studio's
+  stats cannot produce it.
+- **Cost.** "$0 marginal" excludes power, hardware and engineering time.
+
 Rules the harness enforces so numbers stay comparable:
 
 - **Bench refuses to run while a tracked server or foreign GPU process is alive** (`--force` to override).
-- **Quality tasks decode at temperature 0 with a fixed seed**; per-model sampling from `models.toml` is only used for serving/perf.
+- **Quality tasks decode at temperature 0 with a fixed seed**; per-model sampling from `models.toml` is only used for serving/perf. (Fixed seed does not guarantee bit-identical output across batches; verify with a repeat run before claiming determinism.)
+- **Scoring rules are versioned** (`scoring_version` in every run's `task_config`, full tag definitions in `config_hash`); runs scored under different rules are flagged, not silently compared.
 - **The build identity is recorded** (Spark: CUDA arch from `build/spark-arch.txt`; Halo: zip tag and backend); a `121 + GGML_NATIVE=OFF` fallback build is flagged in reports rather than silently compared to `121a-real`.
 
 ### SEC suite
@@ -405,6 +426,7 @@ uv run local-llm eval sec run gpt-oss-20b --task extract-full    # whole filing 
 uv run local-llm eval sec run gpt-oss-20b --task extract-chunked # BM25 top-k chunks (works for 8k-ctx models)
 uv run local-llm eval sec run gpt-oss-20b --task qa-financebench # needs the judge model served too
 uv run local-llm eval sec perf gpt-oss-20b                       # 8k/32k/64k/100k tokens, cold vs warm, concurrency 1,4
+uv run local-llm eval sec run gpt-oss-20b --task extract-full --forms 10-K --no-document  # memorisation control
 uv run local-llm eval report --suite sec
 ```
 

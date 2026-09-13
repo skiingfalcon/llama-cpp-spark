@@ -24,6 +24,7 @@ from spark_llm.evals.sec.parse import (
     words,
 )
 from spark_llm.evals.sec.questions import (
+    SCORING_VERSION,
     Question,
     answer_has_single_number,
     parse_number,
@@ -53,6 +54,15 @@ class SecRunOptions:
     context_window: int | None = None
     max_tokens: int | None = None  # override evals.toml [quality].max_tokens
     reasoning_effort: str | None = None  # override evals.toml [quality].reasoning_effort
+    # Memorisation control: ask the same questions with no filing in context. A model that
+    # scores well here is recalling public XBRL facts, not reading the document.
+    no_document: bool = False
+
+
+def task_label(opts: SecRunOptions) -> str:
+    """Task name recorded on the run; the control variant gets its own name so reports keep
+    it apart from real extraction runs."""
+    return f"{opts.task}-nodoc" if opts.no_document else opts.task
 
 
 class Judge:
@@ -319,8 +329,9 @@ def run_extract(
     *,
     chunked: bool,
 ) -> list[dict[str, Any]]:
-    system = load_prompt("sec_extract_system")
-    user_tpl = load_prompt("sec_extract_user")
+    nodoc = opts.no_document
+    system = load_prompt("sec_extract_nodoc_system" if nodoc else "sec_extract_system")
+    user_tpl = load_prompt("sec_extract_nodoc_user" if nodoc else "sec_extract_user")
     items = _extract_items(filings, facts_paths, cfg)
     if opts.limit:
         items = items[: opts.limit]
@@ -347,24 +358,36 @@ def run_extract(
             "question": q.text,
             "warm": warm,
         }
-        budget = _budget(n_ctx, cfg, len(words(q.text)) * 2)
-        ctx = builder.build(f, q, budget, chunked=chunked)
-        base["mode"] = ctx.mode
-        base["fallback"] = ctx.fallback
-        base["doc_tokens"] = len(docs.ids(f))
-        base["context_tokens"] = ctx.tokens
-        if ctx.text is None:
-            rec = {**base, "skipped": True, "reason": ctx.reason, "correct": None}
-            writer.write(rec)
-            return rec
-        user = user_tpl.format(
-            form=f.form,
-            company=f.company,
-            period_end=f.report_date,
-            document=ctx.text,
-            question=q.text,
-            format_hint=q.format_hint,
-        )
+        if nodoc:
+            base.update(
+                {"mode": "nodoc", "fallback": False, "doc_tokens": None, "context_tokens": 0}
+            )
+            user = user_tpl.format(
+                form=f.form,
+                company=f.company,
+                period_end=f.report_date,
+                question=q.text,
+                format_hint=q.format_hint,
+            )
+        else:
+            budget = _budget(n_ctx, cfg, len(words(q.text)) * 2)
+            ctx = builder.build(f, q, budget, chunked=chunked)
+            base["mode"] = ctx.mode
+            base["fallback"] = ctx.fallback
+            base["doc_tokens"] = len(docs.ids(f))
+            base["context_tokens"] = ctx.tokens
+            if ctx.text is None:
+                rec = {**base, "skipped": True, "reason": ctx.reason, "correct": None}
+                writer.write(rec)
+                return rec
+            user = user_tpl.format(
+                form=f.form,
+                company=f.company,
+                period_end=f.report_date,
+                document=ctx.text,
+                question=q.text,
+                format_hint=q.format_hint,
+            )
         r = _ask(ep, cfg, system, user)
         if not r.ok:
             rec = {
@@ -587,16 +610,19 @@ def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOp
     writer = RunWriter(
         settings,
         "sec",
-        opts.task,
+        task_label(opts),
         run_model,
         server=ep.server_summary(),
         runtime=runtime,
         quality=quality,
         task_config={
+            "scoring_version": SCORING_VERSION,
+            "no_document": opts.no_document,
             "chunk_tokens": cfg.sec.chunk_tokens,
             "top_k": cfg.sec.top_k,
             "tolerance": cfg.sec.tolerance,
-            "tags": [t.tag for t in cfg.sec.xbrl_tags],
+            # Full definitions, not just names: alias or label changes must change config_hash.
+            "tags": [t.model_dump() for t in cfg.sec.xbrl_tags],
             "companies": [c.ticker for c in cfg.sec.companies],
             "forms": cfg.sec.forms,
             "judge": cfg.judge.model if judge else None,

@@ -107,8 +107,8 @@ def test_hardware_block_lists_each_platform_with_paired_scores(tmp_path: Path) -
     assert "## Hardware: same model, different box" in table_md
     assert "### gpt-oss-120b extract-full" in table_md
     # paired on items 1-2: spark 2/2, halo 1/2
-    assert "| spark/cuda | 1 | 2/2 (1.000) |" in table_md
-    assert "| halo/vulkan | 0.5 | 1/2 (0.500) |" in table_md
+    assert "| spark/cuda | 1 | - | 2/2 (1.000) |" in table_md
+    assert "| halo/vulkan | 0.5 | - | 1/2 (0.500) |" in table_md
     assert "AMD Radeon(TM) 8060S Graphics" in table_md and "b10919/" in table_md
 
 

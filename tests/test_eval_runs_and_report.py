@@ -255,7 +255,7 @@ def test_report_has_truncated_column(tmp_path: Path) -> None:
     w.finish({"n": 1, "score": 0.0, "skipped": 0, "truncated": 1})
     _, md = build_report(latest_runs(settings, "sec"))
     assert "| truncated |" in md.splitlines()[0]
-    assert "| m | extract-full | 1 | 0 | 0 | 1 |" in md
+    assert "| m | extract-full | 1 | 0 | - | 0 | 1 |" in md  # CI blank below 5 items
 
 
 def test_evals_toml_loads() -> None:

@@ -10,6 +10,11 @@ from typing import Any
 
 from spark_llm.evals.config import XbrlTag
 
+# Bump whenever ground-truth selection or scoring rules change (alias handling, tolerance,
+# label wording, accept_aliases). Recorded in every run's task_config and config_hash so runs
+# scored under different rules are never silently compared.
+SCORING_VERSION = "2026-09-13.1"
+
 
 @dataclass
 class Question:
