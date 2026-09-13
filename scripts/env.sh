@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared environment for llama.cpp binaries on DGX Spark (GB10 / Blackwell).
+# DGX Spark (Linux/CUDA) only: environment for the source-built llama.cpp binaries.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

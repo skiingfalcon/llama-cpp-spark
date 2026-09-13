@@ -13,7 +13,7 @@ wheels/
 # llama.cpp vendor build (cloned + compiled locally)
 vendor/
 
-# Local model copies (shared store is /opt/models)
+# Local model copies (the shared store lives outside the repo: /opt/models or %LOCALAPPDATA%)
 models/
 *.gguf
 

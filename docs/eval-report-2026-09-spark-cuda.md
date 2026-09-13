@@ -142,7 +142,7 @@ treating 96.4% as a final number.
 - Hard 131K context ceiling; GS / STWD (176K–242K tokens) are answered from Item 8 or
   retrieved chunks rather than the whole filing (recorded as `mode != full`).
 - 120b weights alone are ~63 GB resident; KV cache and concurrency compete for the
-  Spark's 121 GB unified memory.
+  Spark's 128 GB (≈121 GiB usable) unified memory.
 - Slower TTFT than the API (3.7–6.1 s p50 vs 1.2 s).
 - You own ops: process crashes, CUDA upgrades, model pins, auth in front of `0.0.0.0`.
 - ~~`models.toml` still pins 120b at `ctx_size = 65536`~~ — now 131,072 by default.

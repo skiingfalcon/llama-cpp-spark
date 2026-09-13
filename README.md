@@ -6,7 +6,7 @@ and compared with the identical harness:
 
 - **NVIDIA DGX Spark** (GB10 / sm_121, Linux): native CUDA source build. The original target.
 - **AMD Strix Halo** (Ryzen AI Max, Radeon 8060S / gfx1151, **Windows**): prebuilt Vulkan and
-  HIP zips. See [Windows / AMD Strix Halo](#windows--amd-strix-halo).
+  ROCm zips, or LM Studio on locked-down boxes. See [Windows / AMD Strix Halo](#windows--amd-strix-halo).
 
 Models are data (`models.toml` / `models.halo.toml`), not code — add a GGUF by editing TOML or
 passing `--hf` / `--model-path`. Everything platform-specific lives under
@@ -40,7 +40,7 @@ Three ways the same `gpt-oss-120b` MXFP4 weights get served in this project:
 | Item | Value |
 | --- | --- |
 | GPU | NVIDIA GB10 (compute capability 12.1 / sm_121) |
-| Memory | 121 GB unified |
+| Memory | 128 GB unified (≈121 GiB usable) |
 | CUDA | 13.0 toolkit + driver 580.x |
 | CPU / OS | aarch64, Ubuntu |
 | Tooling | uv, Python 3.12, cmake ≥ 3.30 (via `uv tool`), ninja |
@@ -53,7 +53,7 @@ Host cmake 3.28 is too old for the `121a` architecture suffix — install a curr
 | --- | --- |
 | APU | AMD Ryzen AI Max+ 395, Radeon 8060S (gfx1151, RDNA 3.5) |
 | Memory | 128 GB unified LPDDR5X; assign ≥ 96 GB to the iGPU via Variable Graphics Memory |
-| OS | Windows 11 + AMD Adrenalin driver (≥ 26.6.4 for the ROCm/HIP backend) |
+| OS | Windows 11 + AMD Adrenalin driver (≥ 26.6.4 for the ROCm backend) |
 | Tooling | uv, Python 3.12, git — no CMake, no Visual Studio, no ROCm SDK install |
 
 ## Quickstart (DGX Spark)
@@ -99,12 +99,18 @@ Windows, so this section is written for PowerShell.
 
 | Item | Why |
 | --- | --- |
-| AMD Adrenalin driver, current | Vulkan runtime ships with it; the HIP zips need **26.6.4 or newer** |
+| AMD Adrenalin driver, current | Vulkan runtime ships with it; the ROCm zips need **26.6.4 or newer** |
 | **Variable Graphics Memory** set high (≥ 96 GB) | Adrenalin → Performance → Tuning. `gpt-oss-120b` is ~63 GB of weights plus KV cache. Windows caps the iGPU at 96 GB; the setting cannot be read by software, so `doctor` only reminds you |
 | Python 3.12, `uv`, `git` | `uv sync` installs everything else; no CMake, Visual Studio or ROCm SDK |
 | ~70 GB free disk | weights; another ~300 MB for the two llama.cpp zips |
 
 ### Install and run (PowerShell)
+
+> **Status (Sept 2026).** The Halo box available to us is locked down (no Python, no `uv`), so
+> the published Halo numbers were produced through LM Studio with `scripts/lmstudio.mjs` — see
+> [Locked-down machines](#locked-down-machines-lm-studio-extract-full-workaround). The
+> `local-llm` path below is the intended one and is unit-tested against fakes; it has not yet run
+> on real Strix Halo hardware. The `perf` sweep in step 1 has no recorded runs yet.
 
 ```powershell
 git clone https://github.com/skiingfalcon/llama-cpp-spark; cd llama-cpp-spark; uv sync
@@ -114,7 +120,7 @@ uv run local-llm download gpt-oss-120b        # -> %LOCALAPPDATA%\local-llm\mode
 $env:LOCAL_LLM_EDGAR_USER_AGENT = "local-llm you@example.com"
 uv run local-llm eval sec fetch               # SEC corpus (once)
 
-# 1. Hardware sweep on both backends first (8K–100K tokens, cold vs warm cache).
+# 1. Hardware sweep on both backends first (8K–100K tokens, cold vs warm cache). Planned; no runs yet.
 uv run local-llm serve gpt-oss-120b --backend vulkan
 uv run local-llm eval sec perf gpt-oss-120b; uv run local-llm stop
 uv run local-llm serve gpt-oss-120b --backend rocm
@@ -127,12 +133,11 @@ uv run local-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
 uv run local-llm stop; uv run local-llm eval report --suite sec
 ```
 
-`build` resolves the llama.cpp release tag from `LLAMA_CPP_RELEASE` (the nearest tag to the
-Spark's pinned commit), downloads `llama-<tag>-bin-win-vulkan-x64.zip` and
-`llama-<tag>-bin-win-rocm-<ver>-x64.zip`, unpacks them under `vendor/llama.cpp/<tag>-<backend>/`,
-runs `--version` and `--list-devices`, and records everything in `vendor/llama.cpp/halo-build.json`.
-If the official ROCm zip lists no GPU (gfx1151 not covered, or the driver is older than the
-bundled HIP runtime), use AMD's Lemonade build, which has a dedicated gfx1151 target:
+`build` downloads the pinned llama.cpp release zips ([`LLAMA_CPP_RELEASE`](LLAMA_CPP_RELEASE)
+explains how the tag relates to the Spark's commit pin), unpacks them under
+`vendor/llama.cpp/<tag>-<backend>/`, probes `--version` / `--list-devices`, and records the
+result in `vendor/llama.cpp/halo-build.json`. If the official ROCm zip lists no GPU, use AMD's
+Lemonade build, which has a dedicated gfx1151 target:
 `uv run local-llm build --backend rocm --source lemonade --force`.
 
 Eval and report commands are the same as on the Spark. Run artifacts land in the same
@@ -140,27 +145,19 @@ Eval and report commands are the same as on the Spark. Run artifacts land in the
 report keeps runs from different platforms side by side instead of letting a Halo run replace
 the Spark run of the same model.
 
-### Which backend: Vulkan or HIP
+### Which backend: Vulkan or ROCm
 
-Both, measured. The Strix Halo community numbers (Linux, Sept 2026) say the answer depends on
-context length, and this workload sits at the far end:
+Both, measured. Community numbers for gfx1151 (Linux, Sept 2026) said Vulkan wins short-context
+decode and ROCm wins prefill at 100K+ depth by up to 3x, and our filings are 45K–124K tokens.
+The measured result on our Windows box, via LM Studio, was much closer: Vulkan and ROCm within
+about 5 % of each other on cold prefill (4–8 minutes per 100K-token filing versus 40–60 s on the
+Spark), with Vulkan ahead on decode and accuracy. Details and per-item misses:
+[Spark / Halo / Terra report](docs/eval-report-2026-09-spark-halo-terra.md#latency-and-throughput).
+Because the answer depends on the driver, the `perf` sweep stays part of the procedure and the
+report records both backends; the eval request timeout is 3600 s on this platform.
 
-| | Vulkan | HIP (ROCm) |
-| --- | --- | --- |
-| Setup | zero dependencies beyond the driver | driver ≥ 26.6.4; gfx1151 coverage varies by build |
-| Short context (≤ 8K) | fastest decode (~85 vs 64 t/s on a 30B MoE), equal prefill | slightly slower |
-| 130K context depth | prefill collapses (~17 t/s) | ~3x faster prefill with rocWMMA (~51 t/s), equal decode |
-| Windows-specific reports | shared-memory leak on long-running servers (driver 26.3.1) | KV cache lands in shared memory, hurting very long context |
-
-Our filings are 45K–124K tokens, so the `perf` sweep above is not optional: it tells you which
-backend to use for SEC work on *this* driver, and the report records both. Expect cold prefill
-of a 100K-token filing to take minutes on either backend, versus 40–60 s on the Spark; the eval
-request timeout is 3600 s on this platform for that reason.
-
-`models.halo.toml` carries the Strix Halo serving defaults: `--no-mmap` (mmap'd weights are very
-slow on this APU), `ubatch_size = 512` (2048 is implicated in Vulkan `DeviceLost` crashes at
-65–80K context), `n_gpu_layers = 999`, `host = 127.0.0.1`. If `unified_mem` in `perf` output
-climbs monotonically across prompts, add `--kv-unified` (llama.cpp #22372).
+Strix Halo serving defaults (`--no-mmap`, `ubatch_size = 512`, all layers on the iGPU,
+localhost bind) and the reasons for each live in [`models.halo.toml`](models.halo.toml).
 
 ### What differs from the Spark
 
@@ -182,9 +179,11 @@ tests for the Halo code).
 
 ### Why we run llama-server directly and not LM Studio
 
-LM Studio is the easy way to get a model running on this hardware, and it is worth ten minutes
-as a smoke test that the weights load on the GPU and that Variable Graphics Memory is set.
-It is not the benchmark engine, for three concrete reasons:
+`llama-server` driven by `local-llm` is the preferred path. When a box cannot run Python at all,
+the [locked-down workaround](#locked-down-machines-lm-studio-extract-full-workaround) runs the
+same accuracy suite through LM Studio with the caveats listed there. LM Studio is also worth
+ten minutes as a smoke test that the weights load on the GPU and that Variable Graphics Memory
+is set. It is not the preferred benchmark engine, for three concrete reasons:
 
 - **The harness depends on llama-server endpoints LM Studio does not expose in that form.**
   `/tokenize` (context budgeting per model tokenizer), `/props` (served context, build, chat
@@ -222,7 +221,7 @@ No. It shortens the demo, not the deployment.
 | Pinned, recorded build | no (auto-updating runtime) | yes (`LLAMA_CPP_VERSION` / `_RELEASE`) | partial (own release cadence) |
 | API auth / metrics | no / no | `--api-key` / `--metrics` | no / no |
 | Service / container | user session, headless mode | Windows service or Linux container | Windows service, Linux container |
-| Harness compatibility | adapter needed, columns lost | native | adapter needed (no `/tokenize`, `/props`) |
+| Harness compatibility | adapter exists (`scripts/lmstudio.mjs`); loses prompt t/s, cached tokens, exact token counts | native | adapter needed (no `/tokenize`, `/props`) |
 | Flag control (ubatch, KV type, FA) | GUI subset | full | limited |
 | Licence | proprietary, free for work use | MIT | MIT |
 
@@ -234,13 +233,16 @@ build, and its ROCm support for gfx1151 is immature.
 
 Some Halo (or other) boxes are locked down: no Python, no compiler, no admin rights to install
 `uv` / Visual Studio Build Tools, and only a browser-installable app like **LM Studio** is
-allowed. In that case you cannot run `local-llm serve` or the Python SEC harness, but you can
-still run a comparable **extract-full** accuracy check against LM Studio's OpenAI-compatible
-endpoint with the single Node script checked in here:
-
-[`scripts/lmstudio.mjs`](scripts/lmstudio.mjs) — Node 18+ only, no npm dependencies. It mirrors
-the harness corpus (same 12 tickers, 1×10-K + 3×10-Q), XBRL ground truth, prompts, free-text
-scoring, and full → section → BM25 top-k context degradation.
+allowed. You cannot run `local-llm serve` or the Python harness there, but
+[`scripts/lmstudio.mjs`](scripts/lmstudio.mjs) (Node 18+, no npm dependencies) runs the same
+**extract-full** accuracy suite against LM Studio's OpenAI-compatible endpoint and writes the
+same `run.json` / `results.jsonl` shape, so `local-llm eval report` on any Python box compares
+the runs side by side. The script's header comment lists exactly what it mirrors from the
+Python harness and what it cannot (token counts are estimates; the engine is LM Studio's bundled
+runtime, not the pinned build). This is the fallback to the
+[preferred path](#why-we-run-llama-server-directly-and-not-lm-studio), not a replacement: use it
+for an accuracy signal on a locked box, and read the
+[production-path answer](#does-lm-studio-give-an-easier-path-to-production) before building on it.
 
 ```powershell
 # On the locked-down box (PowerShell). Node from nodejs.org is enough.
@@ -252,29 +254,14 @@ node scripts/lmstudio.mjs report
 ```
 
 Optional: `$env:LMS_URL`, `$env:LMS_MODEL`, `$env:LMS_TOKEN`, `--ticker`, `--tag`,
-`--reasoning-effort low`, `--insecure` (corporate TLS inspection).
+`--reasoning-effort low`, `--insecure` (corporate TLS inspection). Runs land under
+`state/evals/sec/<model>-halo-<vulkan|rocm>/`.
 
-**What matches the Python harness:** companies, forms, tags/aliases/`accept_aliases`, question
-wording with period-end dates, prompts, `parse_number` scoring (0.5% tolerance + off-by-scale),
-and the context-degradation policy. Results land under
-`state/evals/sec/<model>-halo-<vulkan|rocm>/<timestamp>-extract-full/` with
-`served_via: lmstudio`, next to the Spark and Terra runs in the same `sec/` tree.
-
-**What does not:** token counts are `chars/4.6` estimates (LM Studio has no `/tokenize`), so
-full vs section vs chunked boundaries can differ slightly; the backend is LM Studio's bundled
-runtime, not the pinned `LLAMA_CPP_RELEASE`; cached-prompt and exact prefill/decode columns are
-indicative only. Use this for an accuracy signal on a locked box, not as a drop-in replacement
-for the Spark hardware comparison. Prefer `local-llm eval sec …` whenever Python is available.
-
-**Results (September 2026):** on the same 121-question 10-K suite,
-**OpenAI hosted (`gpt-5.6-terra`)** scored **120/121 (99.2%)**, **NVIDIA DGX Spark (CUDA)**
-**119/121 (98.3%)**, **AMD Strix Halo (Vulkan)** **117/121 (96.7%)**, and **AMD Strix Halo
-(ROCm)** **115/121 (95.0%)**. Raw artifacts live under `state/evals/sec/` next to the Spark
-and Terra runs (`gpt-oss-120b-spark-cuda`, `gpt-oss-20b-spark-cuda`,
-`gpt-oss-120b-halo-vulkan`, `gpt-oss-120b-halo-rocm`, `openai_gpt-5.6-terra`). Full write-up:
-[docs/eval-report-2026-09-spark-halo-terra.md](docs/eval-report-2026-09-spark-halo-terra.md) (see also
-[eval-report-2026-09-spark-cuda-rerun.md](docs/eval-report-2026-09-spark-cuda-rerun.md) and
-[eval-report-2026-09-spark-cuda.md](docs/eval-report-2026-09-spark-cuda.md)).
+**Results (September 2026):** hosted Terra 99.2 %, DGX Spark 98.3 %, Halo Vulkan 96.7 %, Halo
+ROCm 95.0 % on the same 121 questions; the three local stacks tie at 103/104 on filings that fit
+in 131K. Everything else, including per-item misses and latency, is in
+[docs/eval-report-2026-09-spark-halo-terra.md](docs/eval-report-2026-09-spark-halo-terra.md);
+[docs/index.md](docs/index.md) says which report to read for what.
 
 ### Known gaps on Halo
 
@@ -288,7 +275,8 @@ and Terra runs (`gpt-oss-120b-spark-cuda`, `gpt-oss-20b-spark-cuda`,
 
 ## Adding a model
 
-Edit [`models.toml`](models.toml). No Python changes required.
+Edit [`models.toml`](models.toml) (DGX Spark) and, if the Halo box should serve it too,
+[`models.halo.toml`](models.halo.toml) with the same name and port. No Python changes required.
 
 **Chat model (file + repo):**
 
@@ -350,7 +338,7 @@ Argv is merged in layers: **defaults ← kind flags ← per-model overrides ← 
 uv run local-llm serve --hf TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF:Q4_K_M --port 8099
 
 # Local file already on disk
-uv run local-llm serve --model-path /opt/models/mistral-7b-instruct.Q4_K_M.gguf --port 8083
+uv run local-llm serve --model-path <models_dir>/mistral-7b-instruct.Q4_K_M.gguf --port 8083
 
 # Pass unknown llama-server flags through
 uv run local-llm serve gpt-oss-20b -- --verbose --metrics
@@ -385,7 +373,7 @@ Three different questions hide behind "which model is faster/better"; the CLI ke
 | `local-llm eval swe …` | Coding ability through the served endpoint in three tiers: HumanEval+/MBPP+ (evalplus), Aider polyglot (edit-format compliance), a fixed 50-instance SWE-bench Verified subset (mini-swe-agent + swebench harness). Records tool-call/format failure rates. | Full SWE-bench. |
 
 Every eval run is written to `state/evals/<suite>/<model>/<timestamp>-<task>/` as `run.json`
-(model, GGUF, llama.cpp commit, CUDA arch actually built, server `/props`, decoding settings,
+(model, GGUF, llama.cpp commit or release tag, build identity, server `/props`, decoding settings,
 config hash) plus `results.jsonl`. `local-llm eval report --suite sec|swe` tabulates the
 latest finished run per model **per platform/backend** (`spark/cuda`, `halo/vulkan`,
 `halo/rocm`; API runs are platform-agnostic) and warns when runs used different configs. When
@@ -400,7 +388,7 @@ Rules the harness enforces so numbers stay comparable:
 
 - **Bench refuses to run while a tracked server or foreign GPU process is alive** (`--force` to override).
 - **Quality tasks decode at temperature 0 with a fixed seed**; per-model sampling from `models.toml` is only used for serving/perf.
-- **The CUDA arch that actually built is recorded** (`build/spark-arch.txt`); a `121 + GGML_NATIVE=OFF` fallback build is flagged in reports rather than silently compared to `121a-real`.
+- **The build identity is recorded** (Spark: CUDA arch from `build/spark-arch.txt`; Halo: zip tag and backend); a `121 + GGML_NATIVE=OFF` fallback build is flagged in reports rather than silently compared to `121a-real`.
 
 ### SEC suite
 
@@ -461,11 +449,10 @@ consistently support fixed temperature or seed, so the OpenAI path records and u
 decoding defaults. Use `--limit 1` before a full run to validate model access, context size,
 and likely cost.
 
-Reasoning models (gpt-oss, frontier) spend hidden reasoning tokens from `max_tokens` before
-the visible answer. The `truncated` column counts items that hit the budget with no answer;
-if it is non-zero, raise `[quality].max_tokens` in `evals.toml` (or `--max-tokens`) or lower
-`--reasoning-effort low`. Local runs record the streamed `reasoning_content` length and
-token count per item so the split between thinking and answering is visible.
+Reasoning models spend hidden reasoning tokens from `max_tokens`; the `truncated` column counts
+items that hit the budget with no answer. The knobs (`[quality].max_tokens`,
+`reasoning_effort`) and the reasoning behind their values are documented in
+[`evals.toml`](evals.toml).
 
 Filing work needs context: a 10-K is roughly 50k–150k tokens. Raise `ctx_size` in
 `models.toml` (and consider `cache_type_k`/`cache_type_v = "q8_0"`, `n_parallel`) for the
@@ -483,15 +470,12 @@ uv run local-llm eval swe run gpt-oss-20b --tier 3 --dry-run   # print the harne
 uv run local-llm eval report --suite swe
 ```
 
-External harnesses run via `uvx` with the versions pinned in `evals.toml` and are never
-vendored. Tiers 2 and 3 need Docker; the SWE-bench scoring images are x86_64-first, so the
-intended layout is: Spark serves the model, an x86 box runs `local-llm eval swe … --host <spark>`
-(or `LOCAL_LLM_EVAL_HOST`). The Tier 3 instance list is a seeded sample committed in
-`evals.toml` so every model sees the same 50 tasks. Tier 2/3 command lines were written from
-the harnesses' documented interfaces but have not been executed on this dev box (no Docker);
-run `--dry-run` and check them against the pinned versions before a long run.
+External harnesses run via `uvx` with the versions pinned in [`evals.toml`](evals.toml) and are
+never vendored. Tiers 2 and 3 need Docker on an x86_64 driver box pointed at the serving box
+(`--host` / `LOCAL_LLM_EVAL_HOST`); they have not been executed end to end yet, so run
+`--dry-run` first. The Tier 3 instance list is a seeded sample committed in `evals.toml`.
 
-## Running several models at once
+## Running several models at once (Spark)
 
 Each registry entry has its own `port`. Unified memory on the Spark can hold a chat model and an embedding model together:
 
@@ -513,6 +497,9 @@ PIDs and logs live under `state/`.
 | High latency | Layers on CPU | Ensure `--n-gpu-layers` is high enough; watch `nvidia-smi` during a request |
 | `curl: (7) Failed to connect` | Server not up / wrong port | Wait for health; `local-llm doctor`; check `state/<name>.log` |
 | GGUF download stalls | Network / HF | Re-run `local-llm download …` (resumable) |
+| Halo: model loads partly on CPU, very slow | Variable Graphics Memory too low | Adrenalin → Performance → Tuning → set VGM ≥ 96 GB, reboot |
+| Halo: `rocm build lists no GPU device` | Official zip lacks gfx1151 or driver older than its HIP runtime | Update Adrenalin (≥ 26.6.4) or `local-llm build --backend rocm --source lemonade --force` |
+| Halo: Vulkan `DeviceLost` at 65–80K context | Micro-batch too large for the driver | Keep `ubatch_size = 512` (models.halo.toml default); try `--backend rocm` |
 
 ## Project layout
 
@@ -526,11 +513,15 @@ llama-cpp-spark/
   LLAMA_CPP_RELEASE    # matching llama.cpp release tag (Halo prebuilt zips)
   scripts/build.sh     # CUDA native build (Spark)
   scripts/env.sh       # LD_LIBRARY_PATH for GB10 (Spark)
+  scripts/lmstudio.mjs # Node: extract-full via LM Studio for locked-down boxes
+  scripts/migrate_runs.py  # canonicalise committed run.json files (idempotent)
+  docs/                # eval reports (see docs/index.md) and the stack diagram
   src/spark_llm/       # CLI + argv merge + download + bench (shared)
   src/spark_llm/platforms/spark/  # Linux/CUDA: process control, nvidia-smi, build.sh, doctor
   src/spark_llm/platforms/halo/   # Windows/AMD: zip installer, taskkill/CIM, doctor
   src/spark_llm/evals/ # endpoint client, run records, SEC + SWE suites, report
-  state/bench, state/evals  # persisted results (gitignored)
+  state/evals/         # committed eval artifacts (run.json, results.jsonl, report-sec.md)
+  state/bench/, state/*.log # local only (gitignored)
   tests/               # no-GPU unit tests
   vendor/llama.cpp/    # gitignored clone + build tree
 ```

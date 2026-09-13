@@ -24,7 +24,7 @@ of each other; AMD wall clock is ~3× the NVIDIA Spark because cold ~100K-token 
 | | OpenAI hosted (Terra) | NVIDIA DGX Spark (CUDA) | AMD Strix Halo (Vulkan) | AMD Strix Halo (ROCm) |
 | --- | --- | --- | --- | --- |
 | Model | `gpt-5.6-terra` | `gpt-oss-120b` MXFP4 | same | same |
-| Hardware | OpenAI datacenter | GB10 Blackwell, 128 GB | Radeon 8060S (RDNA 3.5), 128 GB UMA | same |
+| Hardware | OpenAI datacenter | GB10 Blackwell, 128 GB (≈121 GiB usable) | Radeon 8060S (RDNA 3.5), 128 GB UMA | same |
 | OS / path | OpenAI API | DGX OS (Ubuntu, ARM64) | Windows 11 · LM Studio | same |
 | Server | OpenAI | `llama-server` via `local-llm` | LM Studio local server | same |
 | Backend | hosted | ggml-cuda / CUDA + cuBLAS | ggml-vulkan / Vulkan | ggml-hip / ROCm HIP |
@@ -64,38 +64,40 @@ On the 104 filings that fit in 131K, Terra, NVIDIA Spark, and AMD Vulkan all sco
 Terra's remaining edge is reading GS/STWD whole (1.05M context) plus one different miss
 elsewhere (HD shares).
 
-### Per-tag accuracy
+### Per-tag and per-company accuracy (AMD columns)
 
-| Tag | OpenAI hosted (Terra) | NVIDIA DGX Spark (CUDA) | AMD Strix Halo (Vulkan) | AMD Strix Halo (ROCm) |
-| --- | ---: | ---: | ---: | ---: |
-| Assets | 12/12 | 12/12 | 12/12 | 12/12 |
-| CashAndCashEquivalentsAtCarryingValue | 11/11 | 11/11 | 11/11 | 11/11 |
-| CommonStockSharesOutstanding | **9/10** | 10/10 | **9/10** | **9/10** |
-| EarningsPerShareDiluted | 12/12 | 12/12 | **11/12** | **11/12** |
-| Liabilities | 11/11 | 11/11 | 11/11 | 11/11 |
-| LongTermDebtNoncurrent | 9/9 | **8/9** | 9/9 | **8/9** |
-| NetCashProvidedByUsedInOperatingActivities | 12/12 | **11/12** | 12/12 | 12/12 |
-| NetIncomeLoss | 12/12 | 12/12 | **11/12** | **10/12** |
-| OperatingIncomeLoss | 9/9 | 9/9 | 9/9 | 9/9 |
-| Revenues | 11/11 | 11/11 | 11/11 | 11/11 |
-| StockholdersEquity | 12/12 | 12/12 | **11/12** | **11/12** |
+The Spark and Terra per-tag / per-company tables live in the
+[Spark re-run report](eval-report-2026-09-spark-cuda-rerun.md#per-tag-accuracy) and are not
+repeated here; these are the AMD columns for the same 121 questions. Bold marks a miss.
 
-### Per-company accuracy
+| Tag | AMD Strix Halo (Vulkan) | AMD Strix Halo (ROCm) |
+| --- | ---: | ---: |
+| Assets | 12/12 | 12/12 |
+| CashAndCashEquivalentsAtCarryingValue | 11/11 | 11/11 |
+| CommonStockSharesOutstanding | **9/10** | **9/10** |
+| EarningsPerShareDiluted | **11/12** | **11/12** |
+| Liabilities | 11/11 | 11/11 |
+| LongTermDebtNoncurrent | 9/9 | **8/9** |
+| NetCashProvidedByUsedInOperatingActivities | 12/12 | 12/12 |
+| NetIncomeLoss | **11/12** | **10/12** |
+| OperatingIncomeLoss | 9/9 | 9/9 |
+| Revenues | 11/11 | 11/11 |
+| StockholdersEquity | **11/12** | **11/12** |
 
-| Ticker | OpenAI hosted (Terra) | NVIDIA DGX Spark (CUDA) | AMD Strix Halo (Vulkan) | AMD Strix Halo (ROCm) |
-| --- | ---: | ---: | ---: | ---: |
-| AAPL | 11/11 | 11/11 | 11/11 | 11/11 |
-| CAT | 11/11 | **10/11** | 11/11 | 11/11 |
-| GS | **8/8** | **7/8** | **6/8** | **6/8** |
-| HD | **10/11** | 11/11 | 11/11 | 11/11 |
-| INTU | 11/11 | 11/11 | 11/11 | 11/11 |
-| MSFT | 11/11 | 11/11 | 11/11 | 11/11 |
-| NEE | 11/11 | 11/11 | 11/11 | **10/11** |
-| PG | 9/9 | 9/9 | 9/9 | **8/9** |
-| PLTR | 10/10 | 10/10 | **9/10** | **9/10** |
-| STWD | 9/9 | 9/9 | **8/9** | **8/9** |
-| WMT | 9/9 | 9/9 | 9/9 | 9/9 |
-| XOM | 10/10 | 10/10 | 10/10 | 10/10 |
+| Ticker | AMD Strix Halo (Vulkan) | AMD Strix Halo (ROCm) |
+| --- | ---: | ---: |
+| AAPL | 11/11 | 11/11 |
+| CAT | 11/11 | 11/11 |
+| GS | **6/8** | **6/8** |
+| HD | 11/11 | 11/11 |
+| INTU | 11/11 | 11/11 |
+| MSFT | 11/11 | 11/11 |
+| NEE | 11/11 | **10/11** |
+| PG | 9/9 | **8/9** |
+| PLTR | **9/10** | **9/10** |
+| STWD | **8/9** | **8/9** |
+| WMT | 9/9 | 9/9 |
+| XOM | 10/10 | 10/10 |
 
 ### Every miss, itemized
 

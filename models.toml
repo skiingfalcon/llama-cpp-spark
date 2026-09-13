@@ -1,3 +1,6 @@
+# Model registry for the NVIDIA DGX Spark (Linux, CUDA). The AMD Strix Halo box uses
+# models.halo.toml (same model names and ports, different serving knobs).
+
 [defaults]
 n_gpu_layers = 999
 flash_attn = "on"
@@ -39,7 +42,7 @@ port = 8082
 extra_args = ["--jinja"]
 
 [models.mistral-7b-instruct]
-# Already present on this Spark at /opt/models; no HF download required.
+# Local file only (no repo): place it in models_dir yourself.
 file = "mistral-7b-instruct.Q4_K_M.gguf"
 kind = "chat"
 ctx_size = 8192

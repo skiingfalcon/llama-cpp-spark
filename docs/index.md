@@ -1,0 +1,14 @@
+# Eval reports — which one to read
+
+| Read this when… | Report | Status |
+| --- | --- | --- |
+| You want the current headline: Spark vs AMD Strix Halo (Vulkan, ROCm) vs hosted Terra on gpt-oss-120b | [eval-report-2026-09-spark-halo-terra.md](eval-report-2026-09-spark-halo-terra.md) | **latest** (Sept 13, 2026) |
+| You need Spark/Terra detail: per-tag and per-company tables, the 20b model, every miss itemised, cost | [eval-report-2026-09-spark-cuda-rerun.md](eval-report-2026-09-spark-cuda-rerun.md) | current for the Spark and Terra columns |
+| You want the pre-fix run and the explanation of what the harness fixes changed | [eval-report-2026-09-spark-cuda.md](eval-report-2026-09-spark-cuda.md) | superseded; kept for the cross-check |
+
+Each number has one home: the Halo report owns the AMD columns, the re-run owns the Spark and
+Terra columns, and the first report owns the pre-fix baseline. The machine-generated table over
+all committed runs is [`state/evals/report-sec.md`](../state/evals/report-sec.md)
+(`uv run local-llm eval report --suite sec` regenerates it).
+
+`inference-stack-spark-vs-halo.png` is a binary export; there is no diagram source in the repo.
