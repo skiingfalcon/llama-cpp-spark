@@ -21,6 +21,10 @@
  *   --insecure           disable TLS verification (corporate SSL inspection)
  *   --reasoning-effort   low|medium|high (default: unset, matches evals.toml)
  *
+ * Config (companies, tags, tolerance, decoding) comes from evals/generated/sec-config.json and
+ * the prompts from evals/prompts/*.md, both owned by the Python harness. Blocks marked
+ * "Port of ..." re-implement the named Python function; keep them in step when it changes.
+ *
  * Known gaps vs the Python harness (not fixable without a tokenizer endpoint):
  *   - Token counts are chars/4.6 estimates; mode boundaries can differ slightly.
  *   - Backend is LM Studio's runtime, not the pinned llama.cpp build; perf
@@ -42,117 +46,33 @@ import os from 'node:os';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // ---------------------------------------------------------------- config
-// Pinned CIKs from evals.toml [sec].companies (verified 2026-09-12).
+// Everything below is read from files the Python harness owns, never hand-copied:
+//   evals/generated/sec-config.json  <- `uv run local-llm eval sec export-config` (from evals.toml)
+//   evals/prompts/sec_extract_{system,user}.md
+// A Python test asserts the generated JSON matches evals.toml, so this script cannot drift.
 
-const COMPANIES = [
-  { ticker: 'AAPL', cik: 320193 },
-  { ticker: 'MSFT', cik: 789019 },
-  { ticker: 'GS',   cik: 886982 },
-  { ticker: 'XOM',  cik: 34088 },
-  { ticker: 'PLTR', cik: 1321655 },
-  { ticker: 'WMT',  cik: 104169 },
-  { ticker: 'PG',   cik: 80424 },
-  { ticker: 'CAT',  cik: 18230 },
-  { ticker: 'NEE',  cik: 753308 },
-  { ticker: 'HD',   cik: 354950 },
-  { ticker: 'INTU', cik: 896878 },
-  { ticker: 'STWD', cik: 1465128 },
-];
+const CONFIG_PATH = path.join(ROOT, 'evals', 'generated', 'sec-config.json');
+if (!existsSync(CONFIG_PATH)) {
+  console.error(`missing ${CONFIG_PATH}; on a Python box run: uv run local-llm eval sec export-config`);
+  process.exit(1);
+}
+const CONFIG = JSON.parse(await readFile(CONFIG_PATH, 'utf8'));
+const COMPANIES = CONFIG.companies;              // [{ticker, cik}]
+const FORMS = CONFIG.forms;                      // {'10-K': 1, '10-Q': 3}
+const TAGS = CONFIG.tags.map((t) => ({ ...t, aliases: t.aliases ?? [], accept_aliases: !!t.accept_aliases }));
+const TOLERANCE = CONFIG.tolerance;
+const MAX_TOKENS = CONFIG.quality.max_tokens;
+const SEED = CONFIG.quality.seed;
+const CHUNK_TOKENS = CONFIG.chunk_tokens;
+const TOP_K = CONFIG.top_k;
 
-const FORMS = { '10-K': 1, '10-Q': 3 };
-
-/**
- * XBRL tags from evals.toml [[sec.xbrl_tags]]. Concept order is canonical first,
- * then aliases. accept_aliases = same-period family values also count as correct.
- */
-const TAGS = [
-  {
-    tag: 'Revenues',
-    label: "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
-    kind: 'duration', unit: 'USD',
-    aliases: [
-      'RegulatedAndUnregulatedOperatingRevenue',
-      'RevenueFromContractWithCustomerExcludingAssessedTax',
-      'RevenueFromContractWithCustomerIncludingAssessedTax',
-      'SalesRevenueNet',
-    ],
-    accept_aliases: true,
-  },
-  {
-    tag: 'NetIncomeLoss',
-    label: 'net income (loss) attributable to the company',
-    kind: 'duration', unit: 'USD',
-    aliases: ['ProfitLoss', 'NetIncomeLossAvailableToCommonStockholdersBasic'],
-  },
-  {
-    tag: 'OperatingIncomeLoss',
-    label: 'operating income (loss)',
-    kind: 'duration', unit: 'USD',
-    aliases: [],
-  },
-  {
-    tag: 'EarningsPerShareDiluted',
-    label: 'diluted earnings per share',
-    kind: 'duration', unit: 'USD/shares',
-    aliases: [],
-  },
-  {
-    tag: 'NetCashProvidedByUsedInOperatingActivities',
-    label: 'net cash provided by operating activities',
-    kind: 'ytd', unit: 'USD',
-    aliases: [],
-  },
-  {
-    tag: 'Assets',
-    label: 'total assets',
-    kind: 'instant', unit: 'USD',
-    aliases: [],
-  },
-  {
-    tag: 'Liabilities',
-    label: 'total liabilities',
-    kind: 'instant', unit: 'USD',
-    aliases: [],
-  },
-  {
-    tag: 'StockholdersEquity',
-    label: "total stockholders' equity attributable to the company",
-    kind: 'instant', unit: 'USD',
-    aliases: ['StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
-  },
-  {
-    tag: 'CashAndCashEquivalentsAtCarryingValue',
-    label: 'cash and cash equivalents',
-    kind: 'instant', unit: 'USD',
-    aliases: [],
-  },
-  {
-    // LongTermDebt deliberately NOT an alias — wrong ground truth for HD.
-    tag: 'LongTermDebtNoncurrent',
-    label: 'long-term debt, excluding the current portion',
-    kind: 'instant', unit: 'USD',
-    aliases: ['LongTermDebtAndCapitalLeaseObligations'],
-    accept_aliases: true,
-  },
-  {
-    tag: 'CommonStockSharesOutstanding',
-    label: 'common shares outstanding',
-    kind: 'instant', unit: 'shares',
-    aliases: ['EntityCommonStockSharesOutstanding'],
-  },
-];
-
-const TOLERANCE = 0.005;          // 0.5% relative, matches evals.toml
-const MAX_TOKENS = 4096;
-const SEED = 42;
 const CHARS_PER_TOKEN = 4.6;      // approximation; LM Studio has no tokenize endpoint
-const CHUNK_TOKENS = 8000;        // evals.toml sec.chunk_tokens
 const CHUNK_CHARS = Math.round(CHUNK_TOKENS * CHARS_PER_TOKEN);
-const TOP_K = 6;                  // evals.toml sec.top_k
-const PROMPT_OVERHEAD_TOKENS = 256;
+const PROMPT_OVERHEAD_TOKENS = 256; // matches spark_llm.evals.sec.run.PROMPT_OVERHEAD_TOKENS
 
-const SYSTEM_PROMPT =
-  'You are a meticulous financial analyst reading an SEC filing. Answer strictly from the filing text provided. Do not use outside knowledge. If the requested figure is not stated in the text, reply exactly: unknown';
+const PROMPTS = path.join(ROOT, 'evals', 'prompts');
+const SYSTEM_PROMPT = (await readFile(path.join(PROMPTS, 'sec_extract_system.md'), 'utf8')).trim();
+const USER_PROMPT_TEMPLATE = (await readFile(path.join(PROMPTS, 'sec_extract_user.md'), 'utf8')).trim();
 
 const STATE = path.join(ROOT, 'state');
 const FILINGS = path.join(STATE, 'filings');
@@ -783,11 +703,10 @@ function scoreNumeric(answer, expected, alternates = []) {
   return { correct: false, parsed, off_by_scale: scaled, rel_error: rel, matched: null };
 }
 
+// Same template file as the Python harness (str.format placeholders).
 function renderUserPrompt(form, company, periodEnd, document, question, formatHintText) {
-  return `Filing (${form}, ${company}, period ended ${periodEnd}):\n\n`
-       + `<filing>\n${document}\n</filing>\n\n`
-       + `Question: ${question}\n\n`
-       + `Reply with only the value, nothing else. ${formatHintText}`;
+  const vars = { form, company, period_end: periodEnd, document, question, format_hint: formatHintText };
+  return USER_PROMPT_TEMPLATE.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
 }
 
 // ---------------------------------------------------------------- context
@@ -954,7 +873,7 @@ async function cmdRun() {
       const prefill = stats.time_to_first_token;
       if (prefill > 0 && pTok) promptTps.push(pTok / prefill);
 
-      const isTruncated = choice?.finish_reason === 'length' && !parseNumber(answer);
+      const isTruncated = choice?.finish_reason === 'length'; // same rule as ChatResult.truncated
       if (isTruncated) truncated++;
 
       const s = scoreNumeric(answer, q.expected, q.alternates);

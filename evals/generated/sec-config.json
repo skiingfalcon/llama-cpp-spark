@@ -1,0 +1,170 @@
+{
+  "_generated_by": "local-llm eval sec export-config (do not edit; edit evals.toml)",
+  "companies": [
+    {
+      "ticker": "AAPL",
+      "cik": 320193
+    },
+    {
+      "ticker": "MSFT",
+      "cik": 789019
+    },
+    {
+      "ticker": "GS",
+      "cik": 886982
+    },
+    {
+      "ticker": "XOM",
+      "cik": 34088
+    },
+    {
+      "ticker": "PLTR",
+      "cik": 1321655
+    },
+    {
+      "ticker": "WMT",
+      "cik": 104169
+    },
+    {
+      "ticker": "PG",
+      "cik": 80424
+    },
+    {
+      "ticker": "CAT",
+      "cik": 18230
+    },
+    {
+      "ticker": "NEE",
+      "cik": 753308
+    },
+    {
+      "ticker": "HD",
+      "cik": 354950
+    },
+    {
+      "ticker": "INTU",
+      "cik": 896878
+    },
+    {
+      "ticker": "STWD",
+      "cik": 1465128
+    }
+  ],
+  "forms": {
+    "10-K": 1,
+    "10-Q": 3
+  },
+  "tags": [
+    {
+      "tag": "Revenues",
+      "label": "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
+      "kind": "duration",
+      "unit": "USD",
+      "aliases": [
+        "RegulatedAndUnregulatedOperatingRevenue",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "RevenueFromContractWithCustomerIncludingAssessedTax",
+        "SalesRevenueNet"
+      ],
+      "accept_aliases": true
+    },
+    {
+      "tag": "NetIncomeLoss",
+      "label": "net income (loss) attributable to the company",
+      "kind": "duration",
+      "unit": "USD",
+      "aliases": [
+        "ProfitLoss",
+        "NetIncomeLossAvailableToCommonStockholdersBasic"
+      ],
+      "accept_aliases": false
+    },
+    {
+      "tag": "OperatingIncomeLoss",
+      "label": "operating income (loss)",
+      "kind": "duration",
+      "unit": "USD",
+      "aliases": [],
+      "accept_aliases": false
+    },
+    {
+      "tag": "EarningsPerShareDiluted",
+      "label": "diluted earnings per share",
+      "kind": "duration",
+      "unit": "USD/shares",
+      "aliases": [],
+      "accept_aliases": false
+    },
+    {
+      "tag": "NetCashProvidedByUsedInOperatingActivities",
+      "label": "net cash provided by operating activities",
+      "kind": "ytd",
+      "unit": "USD",
+      "aliases": [],
+      "accept_aliases": false
+    },
+    {
+      "tag": "Assets",
+      "label": "total assets",
+      "kind": "instant",
+      "unit": "USD",
+      "aliases": [],
+      "accept_aliases": false
+    },
+    {
+      "tag": "Liabilities",
+      "label": "total liabilities",
+      "kind": "instant",
+      "unit": "USD",
+      "aliases": [],
+      "accept_aliases": false
+    },
+    {
+      "tag": "StockholdersEquity",
+      "label": "total stockholders' equity attributable to the company",
+      "kind": "instant",
+      "unit": "USD",
+      "aliases": [
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+      ],
+      "accept_aliases": false
+    },
+    {
+      "tag": "CashAndCashEquivalentsAtCarryingValue",
+      "label": "cash and cash equivalents",
+      "kind": "instant",
+      "unit": "USD",
+      "aliases": [],
+      "accept_aliases": false
+    },
+    {
+      "tag": "LongTermDebtNoncurrent",
+      "label": "long-term debt, excluding the current portion",
+      "kind": "instant",
+      "unit": "USD",
+      "aliases": [
+        "LongTermDebtAndCapitalLeaseObligations"
+      ],
+      "accept_aliases": true
+    },
+    {
+      "tag": "CommonStockSharesOutstanding",
+      "label": "common shares outstanding",
+      "kind": "instant",
+      "unit": "shares",
+      "aliases": [
+        "EntityCommonStockSharesOutstanding"
+      ],
+      "accept_aliases": false
+    }
+  ],
+  "tolerance": 0.005,
+  "chunk_tokens": 8000,
+  "top_k": 6,
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 4096,
+    "reasoning_effort": null
+  }
+}

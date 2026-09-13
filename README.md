@@ -244,6 +244,11 @@ runtime, not the pinned build). This is the fallback to the
 for an accuracy signal on a locked box, and read the
 [production-path answer](#does-lm-studio-give-an-easier-path-to-production) before building on it.
 
+The script reads its companies, tags, tolerance and decoding settings from
+`evals/generated/sec-config.json` (committed; regenerate with
+`uv run local-llm eval sec export-config` after editing `evals.toml`) and the prompts from
+`evals/prompts/`, so it cannot drift from the Python harness silently.
+
 ```powershell
 # On the locked-down box (PowerShell). Node from nodejs.org is enough.
 $env:EDGAR_UA = "local-llm you@example.com"   # SEC fair-access User-Agent
@@ -508,7 +513,8 @@ llama-cpp-spark/
   models.toml          # model registry, DGX Spark (edit this to add models)
   models.halo.toml     # same models, Strix Halo serving knobs (auto-selected on Windows)
   evals.toml           # eval suites: SEC companies/tags, SWE tiers (data, not code)
-  evals/prompts/       # prompt templates used by the evals
+  evals/prompts/       # prompt templates used by the evals (Python and Node)
+  evals/generated/     # sec-config.json exported from evals.toml for scripts/lmstudio.mjs
   LLAMA_CPP_VERSION    # pinned llama.cpp commit (Spark source build)
   LLAMA_CPP_RELEASE    # matching llama.cpp release tag (Halo prebuilt zips)
   scripts/build.sh     # CUDA native build (Spark)

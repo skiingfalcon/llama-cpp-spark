@@ -11,6 +11,7 @@ from spark_llm.console import err
 from spark_llm.console import out as console
 from spark_llm.evals.config import load_eval_config
 from spark_llm.evals.report import build_report, latest_runs, write_report
+from spark_llm.evals.sec.export import write_generated
 from spark_llm.evals.sec.perf import PerfOptions, run_sec_perf
 from spark_llm.evals.sec.run import TASKS, SecRunOptions, run_sec_task
 from spark_llm.evals.serving import endpoint_for
@@ -60,6 +61,14 @@ def sec_fetch(
         f"[green]ok[/green] {len(manifest.filings)} filings for "
         f"{len(manifest.facts_paths)} companies under {settings.evals_data_dir / 'sec'}"
     )
+
+
+@sec_app.command("export-config")
+def sec_export_config() -> None:
+    """Write evals/generated/sec-config.json for scripts/lmstudio.mjs (after editing evals.toml)."""
+    settings = get_settings()
+    path = write_generated(load_eval_config(settings=settings))
+    console.print(f"[green]wrote[/green] {path}")
 
 
 @sec_app.command("run")
