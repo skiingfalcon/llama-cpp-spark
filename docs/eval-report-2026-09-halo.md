@@ -40,14 +40,15 @@ tolerance. Local stacks: temperature 0, seed 42, `max_tokens` 4096. Terra: provi
 with the same 4096 completion budget, `--parallel 1`. Halo runs used
 `node scripts/lmstudio.mjs run --forms 10-K`.
 
-**Artifacts** (all under `state/evals/sec/` for one-glance tracing):
+**Artifacts** (all under `state/evals/sec/`; folder names encode stack for tracing):
 
 | Stack | Folder |
 | --- | --- |
 | OpenAI hosted (Terra) | [`openai_gpt-5.6-terra/20260912T142344Z-extract-full/`](../state/evals/sec/openai_gpt-5.6-terra/20260912T142344Z-extract-full/) |
-| NVIDIA DGX Spark (CUDA) | [`gpt-oss-120b/20260912T132250Z-extract-full/`](../state/evals/sec/gpt-oss-120b/20260912T132250Z-extract-full/) |
-| AMD Strix Halo (Vulkan) | [`gpt-oss-120b-halo-vulkan/20260913T030643Z-extract-full/`](../state/evals/sec/gpt-oss-120b-halo-vulkan/20260913T030643Z-extract-full/) |
-| AMD Strix Halo (ROCm) | [`gpt-oss-120b-halo-rocm/20260913T044559Z-extract-full/`](../state/evals/sec/gpt-oss-120b-halo-rocm/20260913T044559Z-extract-full/) |
+| NVIDIA DGX Spark (CUDA) · 120b | [`gpt-oss-120b-spark-cuda/20260912T132250Z-extract-full/`](../state/evals/sec/gpt-oss-120b-spark-cuda/20260912T132250Z-extract-full/) |
+| NVIDIA DGX Spark (CUDA) · 20b | [`gpt-oss-20b-spark-cuda/20260912T135023Z-extract-full/`](../state/evals/sec/gpt-oss-20b-spark-cuda/20260912T135023Z-extract-full/) |
+| AMD Strix Halo (Vulkan) · 120b | [`gpt-oss-120b-halo-vulkan/20260913T030643Z-extract-full/`](../state/evals/sec/gpt-oss-120b-halo-vulkan/20260913T030643Z-extract-full/) |
+| AMD Strix Halo (ROCm) · 120b | [`gpt-oss-120b-halo-rocm/20260913T044559Z-extract-full/`](../state/evals/sec/gpt-oss-120b-halo-rocm/20260913T044559Z-extract-full/) |
 
 ## Results
 

@@ -45,8 +45,8 @@ flowchart LR
 - **Hardware / build:** NVIDIA GB10, llama.cpp `82d6bb284d1f`, both local models at 131,072
   tokens per slot. Terra at the published 1.05M context window.
 - **Artifacts:**
-  - [`state/evals/sec/gpt-oss-20b/20260912T022410Z-extract-full/`](../state/evals/sec/gpt-oss-20b/20260912T022410Z-extract-full/)
-  - [`state/evals/sec/gpt-oss-120b/20260912T030429Z-extract-full/`](../state/evals/sec/gpt-oss-120b/20260912T030429Z-extract-full/)
+  - [`state/evals/sec/gpt-oss-20b-spark-cuda/20260912T022410Z-extract-full/`](../state/evals/sec/gpt-oss-20b-spark-cuda/20260912T022410Z-extract-full/)
+  - [`state/evals/sec/gpt-oss-120b-spark-cuda/20260912T030429Z-extract-full/`](../state/evals/sec/gpt-oss-120b-spark-cuda/20260912T030429Z-extract-full/)
   - [`state/evals/sec/openai_gpt-5.6-terra/20260912T033135Z-extract-full/`](../state/evals/sec/openai_gpt-5.6-terra/20260912T033135Z-extract-full/)
 
 ## Results

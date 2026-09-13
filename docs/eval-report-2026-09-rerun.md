@@ -38,11 +38,13 @@ financial-statements section via the new per-filing fallback; Terra read them wh
 - **Hardware / build:** NVIDIA GB10, llama.cpp `82d6bb284d1f`, local models at 131,072
   tokens per slot.
 - **Artifacts (this run):**
-  - [`state/evals/sec/gpt-oss-20b/20260912T135023Z-extract-full/`](../state/evals/sec/gpt-oss-20b/20260912T135023Z-extract-full/)
-  - [`state/evals/sec/gpt-oss-120b/20260912T132250Z-extract-full/`](../state/evals/sec/gpt-oss-120b/20260912T132250Z-extract-full/)
+  - [`state/evals/sec/gpt-oss-20b-spark-cuda/20260912T135023Z-extract-full/`](../state/evals/sec/gpt-oss-20b-spark-cuda/20260912T135023Z-extract-full/)
+  - [`state/evals/sec/gpt-oss-120b-spark-cuda/20260912T132250Z-extract-full/`](../state/evals/sec/gpt-oss-120b-spark-cuda/20260912T132250Z-extract-full/)
   - [`state/evals/sec/openai_gpt-5.6-terra/20260912T142344Z-extract-full/`](../state/evals/sec/openai_gpt-5.6-terra/20260912T142344Z-extract-full/)
-- **First-run artifacts (for cross-checking):** `20260912T022410Z` (20b), `20260912T030429Z`
-  (120b), `20260912T033135Z` (Terra), linked from the first report.
+- **First-run artifacts (for cross-checking):**
+  `gpt-oss-20b-spark-cuda/20260912T022410Z`,
+  `gpt-oss-120b-spark-cuda/20260912T030429Z`,
+  `openai_gpt-5.6-terra/20260912T033135Z`, linked from the first report.
 
 ## Results
 

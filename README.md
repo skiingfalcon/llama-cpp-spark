@@ -269,8 +269,8 @@ for the Spark hardware comparison. Prefer `local-llm eval sec …` whenever Pyth
 **OpenAI hosted (`gpt-5.6-terra`)** scored **120/121 (99.2%)**, **NVIDIA DGX Spark (CUDA)**
 **119/121 (98.3%)**, **AMD Strix Halo (Vulkan)** **117/121 (96.7%)**, and **AMD Strix Halo
 (ROCm)** **115/121 (95.0%)**. Raw artifacts live under `state/evals/sec/` next to the Spark
-and Terra runs (`gpt-oss-120b`, `gpt-oss-120b-halo-vulkan`, `gpt-oss-120b-halo-rocm`,
-`openai_gpt-5.6-terra`). Full write-up:
+and Terra runs (`gpt-oss-120b-spark-cuda`, `gpt-oss-20b-spark-cuda`,
+`gpt-oss-120b-halo-vulkan`, `gpt-oss-120b-halo-rocm`, `openai_gpt-5.6-terra`). Full write-up:
 [docs/eval-report-2026-09-halo.md](docs/eval-report-2026-09-halo.md) (see also
 [eval-report-2026-09-rerun.md](docs/eval-report-2026-09-rerun.md) and
 [eval-report-2026-09.md](docs/eval-report-2026-09.md)).
