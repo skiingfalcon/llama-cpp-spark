@@ -1,54 +1,83 @@
 {
+  "suite": "sec",
   "task": "extract-full",
-  "model": "openai/gpt-oss-120b",
-  "model_label": "gpt-oss-120b-halo-vulkan",
-  "platform": "halo",
-  "backend": "llama.cpp-win-x86_64-vulkan-avx2",
-  "runtime_version": "2.37.0",
-  "served_via": "lmstudio",
-  "quant": "MXFP4",
-  "context": 131072,
-  "decoding": {
+  "model": "gpt-oss-120b",
+  "started": "2026-09-13T03:06:43+00:00",
+  "finished": "2026-09-13T04:23:48+00:00",
+  "provenance": {
+    "timestamp": "2026-09-13T03:06:43+00:00",
+    "hostname": "?",
+    "machine": "x86_64",
+    "spark_llm_version": "lmstudio.mjs/2.37.0",
+    "llama_cpp_pinned": null,
+    "llama_cpp_checkout": null,
+    "cuda_arch": "vulkan:lmstudio-2.37.0",
+    "binary_version": null,
+    "gpu": {},
+    "platform": "halo",
+    "backend": "vulkan",
+    "llama_cpp_release": "2.37.0"
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "served_via": "lmstudio",
+    "runtime": "llama.cpp-win-x86_64-vulkan-avx2",
+    "runtime_version": "2.37.0"
+  },
+  "runtime": {
+    "served_via": "lmstudio",
+    "model_id": "openai/gpt-oss-120b",
+    "quant": "MXFP4",
+    "backend_raw": "llama.cpp-win-x86_64-vulkan-avx2"
+  },
+  "quality": {
     "temperature": 0,
     "seed": 42,
     "max_tokens": 4096
   },
-  "tolerance": 0.005,
-  "chunk_tokens": 8000,
-  "top_k": 6,
-  "token_estimate": "chars/4.6 (approximate)",
-  "started": "20260913T030643Z",
-  "n": 121,
-  "correct": 117,
-  "skipped": 0,
-  "truncated": 0,
-  "fallback": 17,
-  "off_by_scale": 1,
-  "score": 0.9669421487603306,
-  "by_mode": {
-    "full": {
-      "n": 104,
-      "correct": 103
+  "task_config": {
+    "tolerance": 0.005,
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "token_estimate": "chars/4.6 (approximate)"
+  },
+  "config_hash": "58b2946660ca",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "correct": 117,
+    "score": 0.9669421487603306,
+    "skipped": 0,
+    "truncated": 0,
+    "fallback": 17,
+    "off_by_scale": 1,
+    "by_mode": {
+      "full": {
+        "n": 104,
+        "correct": 103
+      },
+      "section": {
+        "n": 17,
+        "correct": 14
+      }
     },
-    "section": {
-      "n": 17,
-      "correct": 14
-    }
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 117
+      }
+    },
+    "prompt_tps_p50": 58352.366641622844,
+    "decode_tps_p50": 28.833551769331585,
+    "cached_prompt_tokens": null,
+    "reasoning_chars": 52918,
+    "wall_clock_s": 4625.133,
+    "ttft_p50_s": 1.38,
+    "total_p50_s": 5.146,
+    "total_p95_s": 300.231,
+    "total_tokens": 9976288
   },
-  "by_form": {
-    "10-K": {
-      "n": 121,
-      "correct": 117
-    }
-  },
-  "ttft_p50": 1.38,
-  "total_p50": 5.146,
-  "total_p95": 300.231,
-  "prompt_tps_p50": 58352.366641622844,
-  "decode_tps_p50": 28.833551769331585,
-  "prompt_tokens": 9976288,
-  "reasoning_chars": 52918,
-  "wall_clock_s": 4625.133,
-  "cached_prompt_tokens": null,
-  "config_hash": "58b2946660ca"
+  "n_results": 121,
+  "format": "runrecord/1",
+  "model_label": "gpt-oss-120b-halo-vulkan"
 }

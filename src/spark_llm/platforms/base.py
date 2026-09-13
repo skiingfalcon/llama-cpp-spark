@@ -32,7 +32,7 @@ class BuildOptions:
 
     backends: list[str] = field(default_factory=list)  # empty = platform default
     tag: str | None = None
-    source: str = "official"  # official | lemonade (hip only)
+    source: str = "official"  # official | lemonade (rocm only)
     asset: str | None = None
     force: bool = False
 

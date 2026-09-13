@@ -3,15 +3,55 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
 from spark_llm.config import Settings
-from spark_llm.evals.runs import RunRecord, evals_root, list_runs, load_results, load_run
+from spark_llm.evals.runs import (
+    RunRecord,
+    evals_root,
+    list_runs,
+    load_results,
+    load_run,
+    normalise_backend,
+)
 
 console = Console()
+
+
+class LoadedRun(NamedTuple):
+    rec: RunRecord
+    dir: Path
+    results: dict[str, dict[str, Any]]
+
+
+def _try_load(run_dir: Path) -> RunRecord | None:
+    """Load one run.json; a file the loader cannot read is reported and skipped, not fatal."""
+    try:
+        return load_run(run_dir)
+    except (ValidationError, ValueError, OSError, KeyError) as exc:
+        first = str(exc).splitlines()[0][:120]
+        console.print(f"[yellow]skip[/yellow] {run_dir}: {type(exc).__name__}: {first}")
+        return None
+
+
+def _result_key(r: dict[str, Any]) -> str:
+    return str(r.get("id") or f"{r.get('kind')}:{r.get('length')}")
+
+
+def load_runs(run_dirs: list[Path]) -> list[LoadedRun]:
+    """Read every run once; all report sections work from this list."""
+    out: list[LoadedRun] = []
+    for d in run_dirs:
+        rec = _try_load(d)
+        if rec is None:
+            continue
+        out.append(LoadedRun(rec, d, {_result_key(r): r for r in load_results(d)}))
+    return out
+
 
 COLUMNS = [
     ("model", "model"),
@@ -50,7 +90,7 @@ def platform_key(rec: RunRecord) -> tuple[str, str | None]:
     if rec.server.get("provider"):
         return ("api", None)
     prov = rec.provenance
-    return (prov.platform or "spark", prov.backend or "cuda")
+    return (prov.platform or "spark", normalise_backend(prov.backend) or "cuda")
 
 
 def platform_label(rec: RunRecord) -> str:
@@ -101,7 +141,9 @@ def latest_runs(settings: Settings, suite: str, models: list[str] | None = None)
     """
     latest: dict[tuple[str, str, str, str | None], Path] = {}
     for run_dir in list_runs(settings, suite):
-        rec = load_run(run_dir)
+        rec = _try_load(run_dir)
+        if rec is None:
+            continue
         if models and rec.model not in models:
             continue
         if rec.finished is None:
@@ -131,19 +173,15 @@ def _is_frontier(model: str) -> bool:
     return model.startswith("openai:") or "terra" in model.lower()
 
 
-def _load_task_runs(
-    run_dirs: list[Path],
-) -> dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]]:
-    by_task: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
-    for d in run_dirs:
-        rec = load_run(d)
-        results = {r["id"]: r for r in load_results(d) if r.get("id")}
-        if results:
-            by_task.setdefault(rec.task, []).append((rec, d, results))
+def _load_task_runs(loaded: list[LoadedRun]) -> dict[str, list[LoadedRun]]:
+    by_task: dict[str, list[LoadedRun]] = {}
+    for lr in loaded:
+        if lr.results:
+            by_task.setdefault(lr.rec.task, []).append(lr)
     return by_task
 
 
-def paired_rows(run_dirs: list[Path]) -> list[dict[str, Any]]:
+def paired_rows(loaded: list[LoadedRun]) -> list[dict[str, Any]]:
     """Like-for-like scores over the items every run of a task answered (none skipped).
 
     Raw ``score`` divides by each run's own answered set, so a model that skipped the hard
@@ -151,7 +189,7 @@ def paired_rows(run_dirs: list[Path]) -> list[dict[str, Any]]:
     fixes the denominator.
     """
     rows: list[dict[str, Any]] = []
-    for task, runs in sorted(_load_task_runs(run_dirs).items()):
+    for task, runs in sorted(_load_task_runs(loaded).items()):
         if len(runs) < 2:
             continue
         answered = [{i for i, r in results.items() if _answered(r)} for _, _, results in runs]
@@ -220,21 +258,19 @@ def _rich_table(title: str, columns: list[tuple[str, str]], rows: list[dict[str,
     return table
 
 
-def comparison_group(
-    run_dirs: list[Path],
-) -> dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]]:
+def comparison_group(loaded: list[LoadedRun]) -> dict[str, list[LoadedRun]]:
     """Latest gpt-oss runs plus the latest OpenAI/Terra run, grouped by task (and platform).
 
     Emits a group only when at least two gpt-oss runs from the same platform/backend and one
     frontier run are present. With runs from several platforms the key becomes
     ``"<task> [<platform>]"`` so each box gets its own block; the frontier run is shared.
     """
-    out: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
-    for task, runs in _load_task_runs(run_dirs).items():
+    out: dict[str, list[LoadedRun]] = {}
+    for task, runs in _load_task_runs(loaded).items():
         frontier = [r for r in runs if _is_frontier(r[0].model)]
         if not frontier:
             continue
-        oss_by_platform: dict[str, list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
+        oss_by_platform: dict[str, list[LoadedRun]] = {}
         for r in runs:
             if _is_oss(r[0].model):
                 oss_by_platform.setdefault(platform_label(r[0]), []).append(r)
@@ -245,9 +281,7 @@ def comparison_group(
     return out
 
 
-def _group_rows(
-    runs: list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]], field: str
-) -> list[dict[str, Any]]:
+def _group_rows(runs: list[LoadedRun], field: str) -> list[dict[str, Any]]:
     keys = sorted({(r.get(field) or "?") for _, _, res in runs for r in res.values()})
     out: list[dict[str, Any]] = []
     for key in keys:
@@ -262,13 +296,11 @@ def _group_rows(
     return out
 
 
-def comparison_blocks(
-    run_dirs: list[Path],
-) -> tuple[list[Table], str]:
+def comparison_blocks(loaded: list[LoadedRun]) -> tuple[list[Table], str]:
     """Headline slices, per-tag / per-company scores, and disagreements for oss vs Terra."""
     tables: list[Table] = []
     md_parts: list[str] = []
-    for task, runs in sorted(comparison_group(run_dirs).items()):
+    for task, runs in sorted(comparison_group(loaded).items()):
         models = [rec.model for rec, _, _ in runs]
         dirs = [d.name for _, d, _ in runs]
         heading = f"{task}: gpt-oss vs Terra"
@@ -389,9 +421,7 @@ HARDWARE_COLUMNS = [
 ]
 
 
-def _accuracy_hardware_rows(
-    runs: list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]],
-) -> list[dict[str, Any]]:
+def _accuracy_hardware_rows(runs: list[LoadedRun]) -> list[dict[str, Any]]:
     answered = [{i for i, r in results.items() if _answered(r)} for _, _, results in runs]
     common = set.intersection(*answered) if answered else set()
     rows: list[dict[str, Any]] = []
@@ -419,7 +449,7 @@ def _accuracy_hardware_rows(
 
 
 def _perf_hardware_rows(
-    runs: list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]],
+    runs: list[LoadedRun],
 ) -> tuple[list[tuple[str, str]], list[dict[str, Any]]]:
     """One row per input length; one column per platform with cold TTFT / pp / tg."""
     labels = sorted({platform_label(rec) for rec, _, _ in runs})
@@ -442,15 +472,13 @@ def _perf_hardware_rows(
     return cols, rows
 
 
-def hardware_blocks(run_dirs: list[Path]) -> tuple[list[Table], str]:
+def hardware_blocks(loaded: list[LoadedRun]) -> tuple[list[Table], str]:
     """Same model + task on more than one platform/backend: the Spark-vs-Halo tables."""
-    groups: dict[tuple[str, str], list[tuple[RunRecord, Path, dict[str, dict[str, Any]]]]] = {}
-    for d in run_dirs:
-        rec = load_run(d)
-        if rec.server.get("provider"):
+    groups: dict[tuple[str, str], list[LoadedRun]] = {}
+    for lr in loaded:
+        if lr.rec.server.get("provider"):
             continue
-        results = {r.get("id") or f"{r.get('kind')}:{r.get('length')}": r for r in load_results(d)}
-        groups.setdefault((rec.model, rec.task), []).append((rec, d, results))
+        groups.setdefault((lr.rec.model, lr.rec.task), []).append(lr)
     tables: list[Table] = []
     md: list[str] = []
     for (model, task), runs in sorted(groups.items()):
@@ -476,9 +504,9 @@ def hardware_blocks(run_dirs: list[Path]) -> tuple[list[Table], str]:
 
 
 def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
+    loaded = load_runs(run_dirs)
     rows = []
-    for d in run_dirs:
-        rec = load_run(d)
+    for rec, d, _ in loaded:
         row = row_for(rec)
         row["run_dir"] = str(d)
         rows.append(row)
@@ -501,7 +529,7 @@ def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
             note = f"task {task}: runs use different configs ({', '.join(sorted(hashes))})"
             console.print(f"[yellow]warning[/yellow] {note}")
             md.append(f"\n> warning: {note}")
-    paired = paired_rows(run_dirs)
+    paired = paired_rows(loaded)
     if paired:
         md.append("\n### Paired (items answered by every run of the task)\n")
         md.append("| " + " | ".join(t for t, _ in PAIRED_COLUMNS) + " |")
@@ -514,12 +542,12 @@ def build_report(run_dirs: list[Path]) -> tuple[Table, str]:
             ptable.add_row(*cells)
             md.append("| " + " | ".join(cells) + " |")
         console.print(ptable)
-    cmp_tables, cmp_md = comparison_blocks(run_dirs)
+    cmp_tables, cmp_md = comparison_blocks(loaded)
     for t in cmp_tables:
         console.print(t)
     if cmp_md:
         md.append(cmp_md)
-    hw_tables, hw_md = hardware_blocks(run_dirs)
+    hw_tables, hw_md = hardware_blocks(loaded)
     for t in hw_tables:
         console.print(t)
     if hw_md:

@@ -26,7 +26,7 @@ Three ways the same `gpt-oss-120b` MXFP4 weights get served in this project:
   `server.py`, and spawns a pinned `llama-server` built by [`scripts/build.sh`](scripts/build.sh)
   (`platforms/spark`, ggml-cuda).
 - **AMD Strix Halo (Vulkan / ROCm)** — same CLI on Windows via `platforms/halo` and the
-  release-zip installer (`--backend vulkan|hip`); intended path when the box allows Python.
+  release-zip installer (`--backend vulkan|rocm`); intended path when the box allows Python.
 - **AMD Strix Halo via LM Studio** — locked-down hosts that cannot install `uv` / a compiler
   still run the extract-full suite through [`scripts/lmstudio.mjs`](scripts/lmstudio.mjs)
   against LM Studio's bundled llama.cpp. See the
@@ -117,12 +117,12 @@ uv run local-llm eval sec fetch               # SEC corpus (once)
 # 1. Hardware sweep on both backends first (8K–100K tokens, cold vs warm cache).
 uv run local-llm serve gpt-oss-120b --backend vulkan
 uv run local-llm eval sec perf gpt-oss-120b; uv run local-llm stop
-uv run local-llm serve gpt-oss-120b --backend hip
+uv run local-llm serve gpt-oss-120b --backend rocm
 uv run local-llm eval sec perf gpt-oss-120b; uv run local-llm stop
-uv run local-llm eval report --suite sec      # "Hardware" block: spark/cuda vs halo/vulkan vs halo/hip
+uv run local-llm eval report --suite sec      # "Hardware" block: spark/cuda vs halo/vulkan vs halo/rocm
 
 # 2. Accuracy run on the backend that won at 100K prefill. Overnight for 120b.
-uv run local-llm serve gpt-oss-120b --backend <vulkan|hip>
+uv run local-llm serve gpt-oss-120b --backend <vulkan|rocm>
 uv run local-llm eval sec run gpt-oss-120b --task extract-full --forms 10-K
 uv run local-llm stop; uv run local-llm eval report --suite sec
 ```
@@ -133,7 +133,7 @@ Spark's pinned commit), downloads `llama-<tag>-bin-win-vulkan-x64.zip` and
 runs `--version` and `--list-devices`, and records everything in `vendor/llama.cpp/halo-build.json`.
 If the official ROCm zip lists no GPU (gfx1151 not covered, or the driver is older than the
 bundled HIP runtime), use AMD's Lemonade build, which has a dedicated gfx1151 target:
-`uv run local-llm build --backend hip --source lemonade --force`.
+`uv run local-llm build --backend rocm --source lemonade --force`.
 
 Eval and report commands are the same as on the Spark. Run artifacts land in the same
 `state/evals/` tree; `run.json` carries `platform`, `backend` and `llama_cpp_release`, and the
@@ -167,7 +167,7 @@ climbs monotonically across prompts, add `--kv-unified` (llama.cpp #22372).
 | | DGX Spark | Strix Halo (Windows) |
 | --- | --- | --- |
 | llama.cpp | pinned commit, CMake + CUDA `sm_121a` source build | pinned release tag, prebuilt `win-vulkan` / `win-rocm` zips |
-| Backend | `cuda` | `vulkan` or `hip`, chosen per `serve --backend` |
+| Backend | `cuda` | `vulkan` or `rocm`, chosen per `serve --backend` |
 | Registry | `models.toml` | `models.halo.toml` (same names and ports) |
 | Weights | `/opt/models` | `%LOCALAPPDATA%\local-llm\models` (`LOCAL_LLM_MODELS_DIR`) |
 | Process control | `setsid` + `SIGTERM` | detached process group + `taskkill /T` |
@@ -388,7 +388,7 @@ Every eval run is written to `state/evals/<suite>/<model>/<timestamp>-<task>/` a
 (model, GGUF, llama.cpp commit, CUDA arch actually built, server `/props`, decoding settings,
 config hash) plus `results.jsonl`. `local-llm eval report --suite sec|swe` tabulates the
 latest finished run per model **per platform/backend** (`spark/cuda`, `halo/vulkan`,
-`halo/hip`; API runs are platform-agnostic) and warns when runs used different configs. When
+`halo/rocm`; API runs are platform-agnostic) and warns when runs used different configs. When
 the latest gpt-oss-20b, gpt-oss-120b, and OpenAI/Terra extract runs are present, the report
 adds a comparison: paired score, full-document vs oversized-filing fallback, per-tag /
 per-company tables, and item-level disagreements. When the same model and task exist on more

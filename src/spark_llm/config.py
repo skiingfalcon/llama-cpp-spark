@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     n_gpu_layers: int = 999
     health_timeout_s: float = 300.0
     health_poll_s: float = 1.0
-    # GPU backend of the llama.cpp binary to run: cuda (Spark), vulkan | hip (Halo). None = the
+    # GPU backend of the llama.cpp binary to run: cuda (Spark), vulkan | rocm (Halo). None = the
     # platform default. Recorded in provenance so runs on different backends stay separate.
     backend: str | None = None
     # Directory holding llama-server(.exe); overrides the platform's discovered location.

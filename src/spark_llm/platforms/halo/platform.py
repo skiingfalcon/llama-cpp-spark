@@ -29,7 +29,10 @@ from spark_llm.platforms.base import BuildOptions, DoctorCheck, GpuProcess
 console = Console(stderr=True)
 
 BUILD_FILE = "halo-build.json"
-BACKENDS = ("vulkan", "hip")
+BACKENDS = ("vulkan", "rocm")
+BACKEND_ALIASES = {
+    "hip": "rocm"
+}  # llama.cpp calls the backend HIP; zips, docs and LM Studio say ROCm
 DEFAULT_BACKEND = "vulkan"
 SERVER_EXE = "llama-server.exe"
 BENCH_EXE = "llama-bench.exe"
@@ -75,6 +78,7 @@ class HaloPlatform:
 
     def backend(self, settings: Settings) -> str:
         value = (settings.backend or DEFAULT_BACKEND).lower()
+        value = BACKEND_ALIASES.get(value, value)
         if value not in BACKENDS:
             choices = " | ".join(BACKENDS)
             raise ValueError(f"backend {value!r} not supported on halo; use {choices}")
@@ -125,6 +129,10 @@ class HaloPlatform:
 
     def popen_kwargs(self) -> dict[str, Any]:
         # Detach from the console so the server survives the CLI exiting; no setsid on Windows.
+        # Forcing the halo platform on another OS is for introspection/tests only; Popen on
+        # POSIX rejects creationflags, so hand back nothing there.
+        if sys.platform != "win32":
+            return {}
         return {"creationflags": CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS}
 
     def terminate(self, pid: int) -> bool:
@@ -304,10 +312,10 @@ class HaloPlatform:
                     f"{name} driver {gpu.get('DriverVersion', '?')}",
                 )
             )
-            if "hip" in backends:
+            if "rocm" in backends:
                 checks.append(
                     DoctorCheck(
-                        "hip driver note",
+                        "rocm driver note",
                         True,
                         "ROCm 7.14+ zips need Adrenalin 26.6.4 or newer; CIM reports the WDDM "
                         f"driver ({gpu.get('DriverVersion', '?')}); check the Adrenalin version "

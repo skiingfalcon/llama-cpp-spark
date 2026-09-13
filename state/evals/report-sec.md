@@ -2,9 +2,11 @@
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | openai:gpt-5.6-terra | extract-full | 121 | 0.992 | 0 | 0 | 1.44 | 1.55 | - | - | 12394653 | 0 | 1260 | 1050000 | openai/api | api | - |
 | gpt-oss-120b | extract-full | 121 | 0.983 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
+| gpt-oss-120b | extract-full | 121 | 0.967 | 0 | 0 | 1.38 | 5.15 | 58,352 | 29 | 9976288 | - | - | 131072 | 2.37.0/vulkan:lmstudio-2.37.0 | halo/vulkan | - |
+| gpt-oss-120b | extract-full | 121 | 0.95 | 0 | 0 | 1.19 | 7.43 | 68,791 | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | - |
 | gpt-oss-20b | extract-full | 121 | 0.876 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
 
-> warning: task extract-full: runs use different configs (9466ddd63b34, 9cc51d84df5a, ea71250ebf92)
+> warning: task extract-full: runs use different configs (58b2946660ca, 9466ddd63b34, 9cc51d84df5a, ea71250ebf92)
 
 ### Paired (items answered by every run of the task)
 
@@ -12,6 +14,8 @@
 |---|---|---|---|---|
 | extract-full | openai:gpt-5.6-terra | 121 | 120 | 0.992 |
 | extract-full | gpt-oss-120b | 121 | 119 | 0.983 |
+| extract-full | gpt-oss-120b | 121 | 117 | 0.967 |
+| extract-full | gpt-oss-120b | 121 | 115 | 0.95 |
 | extract-full | gpt-oss-20b | 121 | 106 | 0.876 |
 
 ### extract-full: gpt-oss vs Terra
@@ -92,3 +96,16 @@ Compared: gpt-oss-120b (`20260912T132250Z-extract-full`), gpt-oss-20b (`20260912
 | WMT:10-K:2026-01-31:LongTermDebtNoncurrent | WMT | ok | miss | ok |
 | XOM:10-K:2025-12-31:LongTermDebtNoncurrent | XOM | ok | miss | ok |
 | XOM:10-K:2025-12-31:Revenues | XOM | ok | miss | ok |
+
+## Hardware: same model, different box
+
+Rows are (platform/backend); `paired` scores every run on the items all of them answered. Latency includes each box's own prefill, so the gap is the hardware gap.
+
+
+### gpt-oss-120b extract-full
+
+| platform | score | paired | truncated | ttft p50 s | total p50 s | total p95 s | prompt t/s | decode t/s | ctx | gpu | build |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| halo/rocm | 0.95 | 115/121 (0.950) | 0 | 1.19 | 7.43 | 238 | 68,791 | 19 | 131072 | - | 2.37.0/rocm:lmstudio-2.37.0 |
+| halo/vulkan | 0.967 | 117/121 (0.967) | 0 | 1.38 | 5.15 | 300 | 58,352 | 29 | 131072 | - | 2.37.0/vulkan:lmstudio-2.37.0 |
+| spark/cuda | 0.983 | 119/121 (0.983) | 0 | 0.565 | 5.79 | 63 | 250 | 30 | 131072 | NVIDIA GB10 | 82d6bb284d1f/? |

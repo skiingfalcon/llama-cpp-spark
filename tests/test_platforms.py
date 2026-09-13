@@ -127,15 +127,15 @@ def test_halo_binary_resolution_order(tmp_path: Path) -> None:
         tmp_path,
         {
             "vulkan": {"tag": "b10919", "source": "official", "bin_dir": str(tmp_path / "vk")},
-            "hip": {"tag": "b10919", "source": "official", "bin_dir": str(tmp_path / "hip")},
+            "rocm": {"tag": "b10919", "source": "official", "bin_dir": str(tmp_path / "rocm")},
         },
     )
     assert plat.binary_path(settings) == tmp_path / "vk" / "llama-server.exe"
     assert (
-        plat.bench_binary(_settings(tmp_path, backend="hip"))
-        == tmp_path / "hip" / "llama-bench.exe"
+        plat.bench_binary(_settings(tmp_path, backend="rocm"))
+        == tmp_path / "rocm" / "llama-bench.exe"
     )
-    assert plat.build_arch(_settings(tmp_path, backend="hip")) == "hip:b10919:official"
+    assert plat.build_arch(_settings(tmp_path, backend="rocm")) == "rocm:b10919:official"
     assert plat.release_tag(settings) == "b10919"
     # 3. explicit bin dir wins over everything
     assert (
@@ -147,10 +147,11 @@ def test_halo_binary_resolution_order(tmp_path: Path) -> None:
 def test_halo_backend_validation(tmp_path: Path) -> None:
     plat = HaloPlatform()
     assert plat.backend(_settings(tmp_path)) == "vulkan"
-    assert plat.backend(_settings(tmp_path, backend="HIP")) == "hip"
+    assert plat.backend(_settings(tmp_path, backend="HIP")) == "rocm"  # alias
+    assert plat.backend(_settings(tmp_path, backend="ROCm")) == "rocm"
     with pytest.raises(ValueError, match="not supported on halo"):
         plat.backend(_settings(tmp_path, backend="cuda"))
-    assert plat.supported_backends() == ["vulkan", "hip"]
+    assert plat.supported_backends() == ["vulkan", "rocm"]
 
 
 def test_halo_runtime_env_and_popen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -164,6 +165,8 @@ def test_halo_runtime_env_and_popen(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert env["PATH"].startswith(str(tmp_path / "vk") + os.pathsep)
     assert env["PATH"].endswith("C:\\Windows")
     assert env.get("LD_LIBRARY_PATH") == "/should/not/matter"  # untouched, not our concern
+    assert plat.popen_kwargs() == {}  # POSIX host: creationflags would be rejected
+    monkeypatch.setattr(sys, "platform", "win32")
     assert plat.popen_kwargs() == {"creationflags": 0x208}
     assert plat.eval_timeout_s() == 3600.0 and plat.memory_metric == "unified_mem"
     assert plat.default_models_toml().name == "models.halo.toml"
@@ -288,5 +291,5 @@ def test_settings_read_new_and_legacy_prefixes(
     assert Settings().models_dir == Path("/legacy")
     monkeypatch.setenv("LOCAL_LLM_MODELS_DIR", "/new")
     assert Settings().models_dir == Path("/new")  # new prefix wins when both are set
-    monkeypatch.setenv("LOCAL_LLM_BACKEND", "hip")
-    assert Settings().backend == "hip"
+    monkeypatch.setenv("LOCAL_LLM_BACKEND", "rocm")
+    assert Settings().backend == "rocm"

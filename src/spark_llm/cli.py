@@ -20,6 +20,7 @@ from spark_llm.client import chat_once
 from spark_llm.config import Settings, get_settings, repo_root
 from spark_llm.download import download_hf_ref, download_model, resolve_weights
 from spark_llm.evals.cli import eval_app
+from spark_llm.evals.runs import BACKEND_ALIASES
 from spark_llm.platforms import current as current_platform
 from spark_llm.platforms.base import BuildOptions
 from spark_llm.registry import ModelKind, ModelSpec, load_registry
@@ -45,7 +46,7 @@ app.add_typer(eval_app, name="eval")
 BACKEND_OPT = typer.Option(
     None,
     "--backend",
-    help="GPU backend of the llama.cpp binary: Spark cuda; Halo vulkan | hip (LOCAL_LLM_BACKEND)",
+    help="GPU backend of the llama.cpp binary: Spark cuda; Halo vulkan | rocm (LOCAL_LLM_BACKEND)",
 )
 
 
@@ -65,7 +66,10 @@ def _with_backend(settings: Settings, backend: str | None) -> Settings:
     if backend is not None:
         settings = settings.model_copy(update={"backend": backend})
     effective = settings.backend
-    if effective is not None and effective.lower() not in plat.supported_backends():
+    if effective is not None:
+        effective = BACKEND_ALIASES.get(effective.lower(), effective.lower())
+        settings = settings.model_copy(update={"backend": effective})
+    if effective is not None and effective not in plat.supported_backends():
         console.print(
             f"[red]backend {effective!r} not available on {plat.name}[/red]; "
             f"choose from {', '.join(plat.supported_backends())}"
@@ -79,10 +83,10 @@ def build(
     backend: str | None = typer.Option(
         None,
         "--backend",
-        help="Halo: vulkan | hip | both (default both). Spark builds CUDA only.",
+        help="Halo: vulkan | rocm | both (default both). Spark builds CUDA only.",
     ),
     source: str = typer.Option(
-        "official", "--source", help="Halo hip zip source: official (ggml-org) | lemonade"
+        "official", "--source", help="Halo rocm zip source: official (ggml-org) | lemonade"
     ),
     tag: str | None = typer.Option(None, "--tag", help="llama.cpp release tag (Halo zips)"),
     asset: str | None = typer.Option(None, "--asset", help="Exact release asset name (Halo)"),

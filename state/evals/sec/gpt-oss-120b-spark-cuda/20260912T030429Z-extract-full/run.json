@@ -23,7 +23,10 @@
       "clocks.mem": "[N/A]",
       "temperature.gpu": "52",
       "power.draw": "11.79"
-    }
+    },
+    "platform": "spark",
+    "backend": "cuda",
+    "llama_cpp_release": null
   },
   "server": {
     "n_ctx_per_slot": 131072,
@@ -124,6 +127,6 @@
     }
   },
   "n_results": 120,
-  "platform": "spark",
-  "backend": "cuda"
+  "format": "runrecord/1",
+  "model_label": "gpt-oss-120b-spark-cuda"
 }

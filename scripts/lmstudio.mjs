@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * sec-lmstudio.mjs — SEC extraction eval against an LM Studio server.
+ * lmstudio.mjs — SEC extraction eval against an LM Studio server.
  *
  * Node 18+ (no npm dependencies). Mirrors the extract-full task from
  * llama-cpp-spark as closely as a single JS file can: same companies, forms
@@ -37,6 +37,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -997,27 +998,7 @@ async function cmdRun() {
     decoding.reasoning_effort = REASONING_EFFORT;
   }
 
-  const run = {
-    task: 'extract-full', model, model_label: modelLabel,
-    platform: 'halo', backend: runtimeInfo?.runtime?.name ?? 'unknown',
-    runtime_version: runtimeInfo?.runtime?.version ?? null,
-    served_via: 'lmstudio', quant: runtimeInfo?.model_info?.quant ?? null,
-    context: ctx,
-    decoding,
-    tolerance: TOLERANCE,
-    chunk_tokens: CHUNK_TOKENS, top_k: TOP_K,
-    token_estimate: `chars/${CHARS_PER_TOKEN} (approximate)`,
-    started: ts, n, correct, skipped, truncated, fallback: fallbacks,
-    off_by_scale: offByScale,
-    score: n ? correct / n : 0,
-    by_mode: byMode, by_form: byForm,
-    ttft_p50: p50(ttfts), total_p50: p50(totals), total_p95: p95(totals),
-    prompt_tps_p50: p50(promptTps), decode_tps_p50: p50(decodeTps),
-    prompt_tokens: promptTokens, reasoning_chars: reasoningChars,
-    wall_clock_s: (Date.now() - wallStart) / 1000,
-    cached_prompt_tokens: null,
-  };
-  run.config_hash = hash({
+  const configHash = hash({
     tags: TAGS.map((t) => t.tag),
     tickers: COMPANIES.map((c) => c.ticker),
     forms: FORMS,
@@ -1026,6 +1007,66 @@ async function cmdRun() {
     chunk_tokens: CHUNK_TOKENS,
     top_k: TOP_K,
   });
+  const startedIso = new Date(wallStart).toISOString().replace(/\.\d{3}Z$/, '+00:00');
+  const finishedIso = new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00');
+  const rtName = runtimeInfo?.runtime?.name ?? 'unknown';
+  const rtVersion = runtimeInfo?.runtime?.version ?? null;
+  // Same shape as spark_llm.evals.runs.RunRecord so `local-llm eval report` reads it directly.
+  const run = {
+    suite: 'sec',
+    task: 'extract-full',
+    model: model.split('/').pop(),  // bare name; the folder label carries platform/backend
+    started: startedIso,
+    finished: finishedIso,
+    provenance: {
+      timestamp: startedIso,
+      hostname: os.hostname(),
+      machine: process.arch,
+      spark_llm_version: `lmstudio.mjs/${rtVersion ?? '?'}`,
+      llama_cpp_pinned: null,
+      llama_cpp_checkout: null,
+      cuda_arch: `${backendTag}:lmstudio-${rtVersion ?? '?'}`,
+      binary_version: rtName,
+      gpu: {},
+      platform: 'halo',
+      backend: backendTag,
+      llama_cpp_release: rtVersion,
+    },
+    server: {
+      n_ctx_per_slot: ctx,
+      served_via: 'lmstudio',
+      runtime: rtName,
+      runtime_version: rtVersion,
+    },
+    runtime: {
+      served_via: 'lmstudio',
+      model_id: model,
+      quant: runtimeInfo?.model_info?.quant ?? null,
+      backend_raw: rtName,
+    },
+    quality: decoding,
+    task_config: {
+      tolerance: TOLERANCE,
+      chunk_tokens: CHUNK_TOKENS,
+      top_k: TOP_K,
+      token_estimate: `chars/${CHARS_PER_TOKEN} (approximate)`,
+      forms: onlyForms,
+    },
+    config_hash: configHash,
+    tools: {},
+    summary: {
+      n, correct, skipped, truncated, fallback: fallbacks, off_by_scale: offByScale,
+      score: n ? correct / n : 0,
+      by_mode: byMode, by_form: byForm,
+      ttft_p50_s: p50(ttfts), total_p50_s: p50(totals), total_p95_s: p95(totals),
+      prompt_tps_p50: p50(promptTps), decode_tps_p50: p50(decodeTps),
+      total_tokens: promptTokens, cached_prompt_tokens: null, reasoning_chars: reasoningChars,
+      wall_clock_s: (Date.now() - wallStart) / 1000,
+    },
+    n_results: n + skipped,
+    format: 'runrecord/1',
+    model_label: modelLabel,
+  };
   await writeFile(path.join(outDir, 'run.json'), JSON.stringify(run, null, 2));
 
   console.log(`\n${correct}/${n} = ${pct(correct, n)}  (fallback ${fallbacks}, truncated ${truncated}, skipped ${skipped})`);
@@ -1054,9 +1095,14 @@ async function cmdReport() {
       runs.push({ run, results: lines, dir: d });
     }
   }
+  // Accessors: RunRecord shape (summary/provenance/server nested) or the old flat layout.
+  const S = (run) => run.summary ?? run;
+  const P = (run) => run.provenance ?? run;
+  const L = (run) => run.model_label ?? run.model;
+  const ctxOf = (run) => run.server?.n_ctx_per_slot ?? run.context;
   const latest = new Map();
-  for (const r of runs) latest.set(r.run.model_label, r);
-  const sel = [...latest.values()].sort((a, b) => (b.run.score ?? 0) - (a.run.score ?? 0));
+  for (const r of runs) latest.set(L(r.run), r);
+  const sel = [...latest.values()].sort((a, b) => (S(b.run).score ?? 0) - (S(a.run).score ?? 0));
   if (!sel.length) { console.log('no runs'); return; }
 
   const row = (c) => c.join('\t');
@@ -1064,15 +1110,16 @@ async function cmdReport() {
                    'ttft p50 s', 'total p50 s', 'total p95 s', 'prompt t/s', 'decode t/s',
                    'tokens', 'cached', 'reasoning', 'ctx', 'build', 'platform', 'note']));
   for (const { run } of sel) {
+    const s = S(run), p = P(run);
     console.log(row([
-      run.model_label, run.task, run.n, (run.score ?? 0).toFixed(3), run.skipped, run.truncated,
-      run.off_by_scale ?? '-',
-      run.ttft_p50?.toFixed(3) ?? '-', run.total_p50?.toFixed(2) ?? '-',
-      run.total_p95?.toFixed(2) ?? '-',
-      run.prompt_tps_p50?.toFixed(0) ?? '-', run.decode_tps_p50?.toFixed(0) ?? '-',
-      run.prompt_tokens, run.cached_prompt_tokens ?? 'n/a', run.reasoning_chars,
-      run.context, `${run.backend}/${run.runtime_version ?? '?'}`,
-      `${run.platform}/${run.served_via}`, run.fallback ? `fallback ${run.fallback}` : '-',
+      L(run), run.task, s.n, (s.score ?? 0).toFixed(3), s.skipped, s.truncated,
+      s.off_by_scale ?? '-',
+      (s.ttft_p50_s ?? s.ttft_p50)?.toFixed(3) ?? '-', (s.total_p50_s ?? s.total_p50)?.toFixed(2) ?? '-',
+      (s.total_p95_s ?? s.total_p95)?.toFixed(2) ?? '-',
+      s.prompt_tps_p50?.toFixed(0) ?? '-', s.decode_tps_p50?.toFixed(0) ?? '-',
+      s.total_tokens ?? s.prompt_tokens, s.cached_prompt_tokens ?? 'n/a', s.reasoning_chars,
+      ctxOf(run), `${p.backend}/${run.server?.runtime_version ?? run.runtime_version ?? '?'}`,
+      `${p.platform}/${run.server?.served_via ?? run.served_via}`, s.fallback ? `fallback ${s.fallback}` : '-',
     ]));
   }
 
@@ -1085,32 +1132,32 @@ async function cmdReport() {
   console.log(row(['task', 'model', 'paired n', 'correct', 'paired score']));
   for (const { run, results } of sel) {
     const hits = results.filter((r) => common.includes(r.id) && r.correct).length;
-    console.log(row([run.task, run.model_label, common.length, hits, pct(hits, common.length)]));
+    console.log(row([run.task, L(run), common.length, hits, pct(hits, common.length)]));
   }
 
   console.log('\nContext mode');
   console.log(row(['model', 'fallback', 'by_mode']));
   for (const { run } of sel) {
-    const modes = Object.entries(run.by_mode ?? {})
+    const modes = Object.entries(S(run).by_mode ?? {})
       .map(([m, v]) => `${m} ${v.correct}/${v.n}`).join(', ');
-    console.log(row([run.model_label, run.fallback, modes]));
+    console.log(row([L(run), S(run).fallback, modes]));
   }
 
   console.log('\nBy form');
-  console.log(row(['form', 'n', ...sel.map((s) => s.run.model_label)]));
-  const forms = [...new Set(sel.flatMap((s) => Object.keys(s.run.by_form ?? {})))].sort();
+  console.log(row(['form', 'n', ...sel.map((s) => L(s.run))]));
+  const forms = [...new Set(sel.flatMap((s) => Object.keys(S(s.run).by_form ?? {})))].sort();
   for (const form of forms) {
     const cells = sel.map((s) => {
-      const v = s.run.by_form?.[form];
+      const v = S(s.run).by_form?.[form];
       return v ? `${v.correct}/${v.n} (${pct(v.correct, v.n)})` : '-';
     });
-    const nk = sel[0].run.by_form?.[form]?.n ?? 0;
+    const nk = S(sel[0].run).by_form?.[form]?.n ?? 0;
     console.log(row([form, nk, ...cells]));
   }
 
   for (const [label, key] of [['By tag', 'tag'], ['By company', 'ticker']]) {
     console.log(`\n${label}`);
-    console.log(row([key === 'tag' ? 'tag' : 'ticker', 'n', ...sel.map((s) => s.run.model_label)]));
+    console.log(row([key === 'tag' ? 'tag' : 'ticker', 'n', ...sel.map((s) => L(s.run))]));
     const keys = [...new Set(sel.flatMap((s) => s.results.map((r) => r[key])))].filter(Boolean).sort();
     for (const k of keys) {
       const cells = sel.map((s) => {
@@ -1124,7 +1171,7 @@ async function cmdReport() {
   }
 
   console.log('\nDisagreements');
-  console.log(row(['id', 'ticker', ...sel.map((s) => s.run.model_label)]));
+  console.log(row(['id', 'ticker', ...sel.map((s) => L(s.run))]));
   for (const id of common) {
     const cells = sel.map((s) => {
       const r = s.results.find((x) => x.id === id);

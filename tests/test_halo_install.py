@@ -93,15 +93,15 @@ def test_pick_asset_patterns_and_override() -> None:
     assert inst.pick_asset(assets, inst.ASSET_PATTERNS[("official", "vulkan")], None)[
         "name"
     ].endswith("win-vulkan-x64.zip")
-    assert inst.pick_asset(assets, inst.ASSET_PATTERNS[("official", "hip")], None)["name"].endswith(
-        "win-rocm-10.0-x64.zip"
-    )
+    assert inst.pick_asset(assets, inst.ASSET_PATTERNS[("official", "rocm")], None)[
+        "name"
+    ].endswith("win-rocm-10.0-x64.zip")
     lem = _release("b1328", LEMONADE_ASSETS)["assets"]
-    assert inst.pick_asset(lem, inst.ASSET_PATTERNS[("lemonade", "hip")], None)["name"].endswith(
+    assert inst.pick_asset(lem, inst.ASSET_PATTERNS[("lemonade", "rocm")], None)["name"].endswith(
         "gfx1151-x64.zip"
     )
     assert (
-        inst.pick_asset(assets, inst.ASSET_PATTERNS[("official", "hip")], OFFICIAL_ASSETS[0])[
+        inst.pick_asset(assets, inst.ASSET_PATTERNS[("official", "rocm")], OFFICIAL_ASSETS[0])[
             "name"
         ]
         == OFFICIAL_ASSETS[0]
@@ -159,12 +159,12 @@ def test_install_both_backends_writes_build_json(
     rc = inst.install(settings, BuildOptions(), client=_client(zip_prefix=prefix))
     assert rc == 0
     info = load_build_info(settings)
-    assert set(info["backends"]) == {"vulkan", "hip"}
+    assert set(info["backends"]) == {"vulkan", "rocm"}
     vk = info["backends"]["vulkan"]
     assert vk["tag"] == TAG and vk["source"] == "official"
     assert (Path(vk["bin_dir"]) / "llama-server.exe").is_file()
     assert Path(vk["bin_dir"]).is_relative_to(tmp_path / "vendor" / f"{TAG}-vulkan")
-    assert info["backends"]["hip"]["asset"].endswith("win-rocm-10.0-x64.zip")
+    assert info["backends"]["rocm"]["asset"].endswith("win-rocm-10.0-x64.zip")
 
 
 def test_install_lemonade_source_and_idempotency(
@@ -173,10 +173,10 @@ def test_install_lemonade_source_and_idempotency(
     monkeypatch.setattr(inst, "pinned_release", lambda: TAG)
     settings = _settings(tmp_path)
     assert (
-        inst.install(settings, BuildOptions(backends=["hip"], source="lemonade"), client=_client())
+        inst.install(settings, BuildOptions(backends=["rocm"], source="lemonade"), client=_client())
         == 0
     )
-    hip = load_build_info(settings)["backends"]["hip"]
+    hip = load_build_info(settings)["backends"]["rocm"]
     assert hip["source"] == "lemonade" and hip["tag"] == "b1328" and "gfx1151" in hip["asset"]
     # second run without --force skips (bin dir still present)
     calls: list[str] = []
@@ -188,14 +188,14 @@ def test_install_lemonade_source_and_idempotency(
 
     monkeypatch.setattr(inst, "download", spy)
     assert (
-        inst.install(settings, BuildOptions(backends=["hip"], source="lemonade"), client=_client())
+        inst.install(settings, BuildOptions(backends=["rocm"], source="lemonade"), client=_client())
         == 0
     )
     assert calls == []
     assert (
         inst.install(
             settings,
-            BuildOptions(backends=["hip"], source="lemonade", force=True),
+            BuildOptions(backends=["rocm"], source="lemonade", force=True),
             client=_client(),
         )
         == 0
@@ -208,14 +208,14 @@ def test_install_reinstalls_when_source_or_tag_differs(
 ) -> None:
     monkeypatch.setattr(inst, "pinned_release", lambda: TAG)
     settings = _settings(tmp_path)
-    assert inst.install(settings, BuildOptions(backends=["hip"]), client=_client()) == 0
-    assert load_build_info(settings)["backends"]["hip"]["source"] == "official"
+    assert inst.install(settings, BuildOptions(backends=["rocm"]), client=_client()) == 0
+    assert load_build_info(settings)["backends"]["rocm"]["source"] == "official"
     # asking for the lemonade build must not be skipped because an official one exists
     assert (
-        inst.install(settings, BuildOptions(backends=["hip"], source="lemonade"), client=_client())
+        inst.install(settings, BuildOptions(backends=["rocm"], source="lemonade"), client=_client())
         == 0
     )
-    assert load_build_info(settings)["backends"]["hip"]["source"] == "lemonade"
+    assert load_build_info(settings)["backends"]["rocm"]["source"] == "lemonade"
 
 
 def test_resolve_tag_falls_back_to_latest_when_pin_is_newer(

@@ -84,11 +84,11 @@ def test_latest_runs_keeps_one_per_platform_backend(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     _run(settings, "gpt-oss-120b", "extract-full", _prov("spark", "cuda"), _items(True, True))
     _run(settings, "gpt-oss-120b", "extract-full", _prov("halo", "vulkan"), _items(True, False))
-    _run(settings, "gpt-oss-120b", "extract-full", _prov("halo", "hip"), _items(True, True))
+    _run(settings, "gpt-oss-120b", "extract-full", _prov("halo", "rocm"), _items(True, True))
     dirs = latest_runs(settings, "sec")
     assert len(dirs) == 3
     labels = sorted(platform_label(load_run(d)) for d in dirs)
-    assert labels == ["halo/hip", "halo/vulkan", "spark/cuda"]
+    assert labels == ["halo/rocm", "halo/vulkan", "spark/cuda"]
 
 
 def test_hardware_block_lists_each_platform_with_paired_scores(tmp_path: Path) -> None:

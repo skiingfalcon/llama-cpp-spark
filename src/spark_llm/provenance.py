@@ -3,7 +3,7 @@
 Numbers without this block are not comparable across rebuilds: build.sh can silently fall
 back from ``121a-real`` to ``121 + GGML_NATIVE=OFF``, which changes prompt-processing speed.
 With two machines in play the block also names the platform (spark / halo), the GPU backend
-(cuda / vulkan / hip) and, for prebuilt zips, the llama.cpp release tag.
+(cuda / vulkan / rocm) and, for prebuilt zips, the llama.cpp release tag.
 """
 
 from __future__ import annotations

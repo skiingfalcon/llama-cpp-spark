@@ -31,6 +31,7 @@ from rich.console import Console
 from spark_llm.config import Settings, repo_root
 from spark_llm.platforms.base import BuildOptions
 from spark_llm.platforms.halo.platform import (
+    BACKEND_ALIASES,
     BACKENDS,
     SERVER_EXE,
     HaloPlatform,
@@ -49,8 +50,8 @@ RELEASE_FILE = "LLAMA_CPP_RELEASE"
 VERSION_FILE = "LLAMA_CPP_VERSION"
 ASSET_PATTERNS = {
     ("official", "vulkan"): re.compile(r"^llama-.*-bin-win-vulkan-x64\.zip$"),
-    ("official", "hip"): re.compile(r"^llama-.*-bin-win-rocm-[\d.]+-x64\.zip$"),
-    ("lemonade", "hip"): re.compile(r"^llama-.*-windows-rocm-gfx1151-x64\.zip$"),
+    ("official", "rocm"): re.compile(r"^llama-.*-bin-win-rocm-[\d.]+-x64\.zip$"),
+    ("lemonade", "rocm"): re.compile(r"^llama-.*-windows-rocm-gfx1151-x64\.zip$"),
 }
 SOURCES = ("official", "lemonade")
 
@@ -192,12 +193,12 @@ def probe(bin_dir: Path, env: dict[str, str]) -> dict[str, Any]:
 
 
 def install(settings: Settings, opts: BuildOptions, client: httpx.Client | None = None) -> int:
-    backends = [b.lower() for b in (opts.backends or ["both"])]
+    backends = [BACKEND_ALIASES.get(b.lower(), b.lower()) for b in (opts.backends or ["both"])]
     if backends == ["both"]:
         backends = list(BACKENDS)
     bad = [b for b in backends if b not in BACKENDS]
     if bad:
-        console.print(f"[red]unknown backend[/red] {', '.join(bad)}; use vulkan | hip | both")
+        console.print(f"[red]unknown backend[/red] {', '.join(bad)}; use vulkan | rocm | both")
         return 2
     if opts.source not in SOURCES:
         console.print(f"[red]unknown source[/red] {opts.source}; use official | lemonade")
@@ -215,7 +216,7 @@ def install(settings: Settings, opts: BuildOptions, client: httpx.Client | None 
         else:
             console.print(f"[cyan]tag[/cyan] {resolved.tag}")
         for backend in backends:
-            source = opts.source if backend == "hip" else "official"
+            source = opts.source if backend == "rocm" else "official"
             existing = info["backends"].get(backend)
             same_request = bool(existing) and (
                 existing.get("source") == source
@@ -268,11 +269,11 @@ def install(settings: Settings, opts: BuildOptions, client: httpx.Client | None 
                     f"[yellow]note[/yellow] {backend} binary is commit {entry['commit']}, "
                     f"Spark pin is {pinned}; recorded in provenance"
                 )
-            if backend == "hip" and entry["devices"] == [] and entry["server_version"]:
+            if backend == "rocm" and entry["devices"] == [] and entry["server_version"]:
                 console.print(
-                    "[red]hip build lists no GPU device[/red]: the zip may not include gfx1151 or "
+                    "[red]rocm build lists no GPU device[/red]: the zip may not include gfx1151 or "
                     "the Adrenalin driver is older than the bundled HIP runtime needs (>= 26.6.4). "
-                    "Try: local-llm build --backend hip --source lemonade --force"
+                    "Try: local-llm build --backend rocm --source lemonade --force"
                 )
                 rc = 1
             info["backends"][backend] = entry
