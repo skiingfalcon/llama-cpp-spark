@@ -16,5 +16,8 @@ all committed runs is [`state/evals/report-sec.md`](../state/evals/report-sec.md
 Every report now carries a "Review notes" block under its Caveats listing what the numbers
 cannot support (single run, no memorisation control yet, unequal context, revised ground truth).
 
+A talk-through slide deck of the results lives in [`deck/`](deck/README.md)
+(`local-inference-2026-09.pdf`; Marp source alongside).
+
 Posts and write-ups published outside the repo, with links and the feedback they drew, are
 logged in [`posts/README.md`](posts/README.md).

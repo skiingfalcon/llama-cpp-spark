@@ -545,6 +545,7 @@ llama-cpp-spark/
   scripts/migrate_runs.py  # canonicalise committed run.json files (idempotent)
   docs/                # eval reports (see docs/index.md) and the stack diagram
   docs/posts/          # drafts and log of everything published outside the repo
+  docs/deck/           # Marp slide deck of the results (md source, charts, html, pdf)
   src/spark_llm/       # CLI + argv merge + download + bench (shared)
   src/spark_llm/platforms/spark/  # Linux/CUDA: process control, nvidia-smi, build.sh, doctor
   src/spark_llm/platforms/halo/   # Windows/AMD: zip installer, taskkill/CIM, doctor
