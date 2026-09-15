@@ -11,7 +11,8 @@ from spark_llm.evals.endpoint import percentile
 
 # -- evalplus (tier 1) -------------------------------------------------------------------------
 
-_PASS_AT_1 = re.compile(r"^(?P<ds>\w+)\s*\((?P<which>base tests|base \+ extra tests)\)\s*$", re.M)
+# evalplus prints "humaneval (base tests)" then "humaneval+ (base + extra tests)"; allow the "+".
+_PASS_AT_1 = re.compile(r"^(?P<ds>\w+)\+?\s*\((?P<which>base tests|base \+ extra tests)\)\s*$", re.M)
 _SCORE = re.compile(r"pass@1:\s*(?P<v>[0-9.]+)")
 
 
@@ -36,7 +37,8 @@ def normalize_evalplus(
     root: Path, dataset: str, stdout: str
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for path in sorted(root.rglob("eval_results.json")):
+    # evalplus >= 0.3 writes "<model>_<backend>_temp_<t>_eval_results.json", not a bare name.
+    for path in sorted(root.rglob("*eval_results.json")):
         if dataset not in str(path).lower():
             continue
         data = json.loads(path.read_text())

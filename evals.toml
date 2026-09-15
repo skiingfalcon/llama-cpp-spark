@@ -131,7 +131,7 @@ aliases = ["EntityCommonStockSharesOutstanding"]
 # any commercial redistribution of derived numbers. Set enabled = false to skip.
 enabled = true
 repo = "PatronusAI/financebench"
-file = "financebench_open_source.jsonl"
+file = "financebench_merged.jsonl"   # HF dataset was reorganised; open_source.jsonl no longer exists (2026-09-15)
 license = "CC-BY-NC-4.0"
 
 # --------------------------------------------------------------------------------------------
