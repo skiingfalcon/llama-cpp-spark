@@ -79,6 +79,9 @@ class SweTier(BaseModel):
     instances: list[str] = Field(default_factory=list)
     workers: int = 4
     step_limit: int | None = None
+    # Tier 1 only: completion budget passed to evalplus (--max-new-tokens). evalplus defaults to
+    # 768, which a reasoning model spends on hidden thinking before any code appears.
+    max_new_tokens: int | None = None
 
 
 class SweSuite(BaseModel):

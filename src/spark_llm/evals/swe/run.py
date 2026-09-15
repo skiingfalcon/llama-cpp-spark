@@ -127,6 +127,24 @@ def run_tier1(
             "--root",
             str(work),
         ]
+        if tier.max_new_tokens:
+            # evalplus 0.3.1 (still the latest on PyPI) hard-codes DecoderBase.max_new_tokens=768
+            # and exposes no CLI flag for it, so run evalplus.evaluate in-process with the default
+            # overridden. Same pinned package, same entry point, one constructor default changed.
+            shim = "\n".join(
+                [
+                    "import evalplus.provider.base as _b",
+                    "_init = _b.DecoderBase.__init__",
+                    "def _patched(self, name, *a, **k):",
+                    f"    k['max_new_tokens'] = {int(tier.max_new_tokens)}",
+                    "    return _init(self, name, *a, **k)",
+                    "_b.DecoderBase.__init__ = _patched",
+                    "from evalplus.evaluate import main",
+                    "main()",
+                ]
+            )
+            cmd[3:4] = ["python", "-c", shim]
+            writer.record.tools["evalplus_max_new_tokens"] = str(tier.max_new_tokens)
         out = _run(cmd, cwd=work, env=env, dry=opts.dry_run, log=work / f"{ds}.log")
         results, summary = normalize_evalplus(work, ds, out)
         for r in results:

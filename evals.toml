@@ -142,6 +142,9 @@ license = "CC-BY-NC-4.0"
 tool = "evalplus"
 version = "0.3.1"
 datasets = ["humaneval", "mbpp"]
+# Completion budget per problem (evalplus --max-new-tokens; its default is 768). Reasoning models
+# emit hidden thinking inside this budget, so give them the same 4096 the SEC suite uses.
+max_new_tokens = 4096
 
 [swe.tier2]
 # Aider polyglot benchmark: 225 exercises, 6 languages; measures edit-format compliance.
