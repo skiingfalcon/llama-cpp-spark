@@ -584,6 +584,7 @@ llama-cpp-spark/
   docs/                # eval reports (see docs/index.md) and the stack diagram
   docs/posts/          # drafts and log of everything published outside the repo
   docs/deck/           # Marp slide deck of the results (md source, charts, html, pdf)
+  docs/models/         # per-model reference cards: config used, results, strengths, changelog
   src/spark_llm/       # CLI + argv merge + download + bench (shared)
   src/spark_llm/platforms/spark/  # Linux/CUDA: process control, nvidia-smi, build.sh, doctor
   src/spark_llm/platforms/halo/   # Windows/AMD: zip installer, taskkill/CIM, doctor

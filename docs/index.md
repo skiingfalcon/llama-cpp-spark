@@ -17,6 +17,9 @@ all committed runs is [`state/evals/report-sec.md`](../state/evals/report-sec.md
 Every report now carries a "Review notes" block under its Caveats listing what the numbers
 cannot support (single run, no memorisation control yet, unequal context, revised ground truth).
 
+Per-model reference cards (identity, exact serving config, measured results, strengths and
+weaknesses, changelog) live in [`models/`](models/README.md). Update a card whenever a run lands.
+
 A talk-through slide deck of the results lives in [`deck/`](deck/README.md)
 (`local-inference-2026-09.pdf`; Marp source alongside).
 
