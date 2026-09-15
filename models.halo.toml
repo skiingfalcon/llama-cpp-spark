@@ -66,3 +66,15 @@ n_parallel = 1
 port = 8085
 extra_args = ["--jinja", "--no-mmap"]
 sampling = { temp = 0.6, top_p = 0.95 }
+
+[models."qwen3.8-27b"]
+# Dense 27B VL (arch qwen35), native 262K ctx. Added for the RTX 5090 CUDA run; same name, quant,
+# port and flags as the Spark entry in models.toml. ubatch 2048: the Halo default of 512 is an AMD
+# Vulkan workaround that does not apply to CUDA. No --no-mmap.
+repo = "unsloth/Qwen3.8-27B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8084
+ubatch_size = 2048
+extra_args = ["--jinja"]

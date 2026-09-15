@@ -1,0 +1,234 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "qwen3.8-27b",
+  "started": "2026-09-15T15:23:12+00:00",
+  "finished": "2026-09-15T15:47:31+00:00",
+  "provenance": {
+    "timestamp": "2026-09-15T15:23:12+00:00",
+    "hostname": "Mike-PC",
+    "machine": "AMD64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": null,
+    "build_id": null,
+    "binary_version": null,
+    "gpu": {
+      "name": "AMD Radeon(TM) Graphics",
+      "driver_version": "32.0.21034.41",
+      "driver_date": "/Date(1779062400000)/",
+      "memory.total": "63069"
+    },
+    "platform": "halo",
+    "backend": "vulkan",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 262144,
+    "total_slots": 4,
+    "model_path": "C:\\Users\\Mike\\AppData\\Local\\local-llm\\models\\unsloth__Qwen3.8-27B-GGUF\\Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "chat_template_sha": "12827f24b742",
+    "build_info": "b10919-d3146f2b5"
+  },
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 8084,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": null,
+    "cache_type_k": "q8_0",
+    "cache_type_v": "q8_0",
+    "model_path": "C:\\Users\\Mike\\AppData\\Local\\local-llm\\models\\unsloth__Qwen3.8-27B-GGUF\\Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 4096,
+    "reasoning_effort": null
+  },
+  "task_config": {
+    "scoring_version": "2026-09-13.1",
+    "no_document": false,
+    "max_input_tokens": 0,
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      {
+        "tag": "Revenues",
+        "label": "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "RegulatedAndUnregulatedOperatingRevenue",
+          "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "RevenueFromContractWithCustomerIncludingAssessedTax",
+          "SalesRevenueNet"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "NetIncomeLoss",
+        "label": "net income (loss) attributable to the company",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "ProfitLoss",
+          "NetIncomeLossAvailableToCommonStockholdersBasic"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "OperatingIncomeLoss",
+        "label": "operating income (loss)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "EarningsPerShareDiluted",
+        "label": "diluted earnings per share",
+        "kind": "duration",
+        "unit": "USD/shares",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "NetCashProvidedByUsedInOperatingActivities",
+        "label": "net cash provided by operating activities",
+        "kind": "ytd",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Assets",
+        "label": "total assets",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Liabilities",
+        "label": "total liabilities",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "StockholdersEquity",
+        "label": "total stockholders' equity attributable to the company",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "CashAndCashEquivalentsAtCarryingValue",
+        "label": "cash and cash equivalents",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "LongTermDebtNoncurrent",
+        "label": "long-term debt, excluding the current portion",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "LongTermDebtAndCapitalLeaseObligations"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "CommonStockSharesOutstanding",
+        "label": "common shares outstanding",
+        "kind": "instant",
+        "unit": "shares",
+        "aliases": [
+          "EntityCommonStockSharesOutstanding"
+        ],
+        "accept_aliases": false
+      }
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "607363d040e8",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "scored": 121,
+    "correct": 119,
+    "score": 0.9834710743801653,
+    "skipped": 0,
+    "errors": 0,
+    "off_by_scale": 0,
+    "truncated": 0,
+    "ttft_p50_s": 1.4356403999991016,
+    "ttft_p95_s": 39.84443079999983,
+    "total_p50_s": 6.213925799998833,
+    "total_p95_s": 43.43530000000101,
+    "prompt_tps_p50": 1668.3461073449666,
+    "decode_tps_p50": 54.870583631831785,
+    "total_tokens": 12770130,
+    "cached_prompt_tokens": 11231740,
+    "reasoning_tokens": 35530,
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 119
+      }
+    },
+    "by_mode": {
+      "full": {
+        "n": 113,
+        "correct": 111
+      },
+      "section": {
+        "n": 8,
+        "correct": 8
+      }
+    },
+    "fallback": 8
+  },
+  "n_results": 121,
+  "format": "runrecord/1",
+  "model_label": "qwen3.8-27b-halo-vulkan"
+}

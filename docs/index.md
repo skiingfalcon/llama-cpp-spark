@@ -5,6 +5,7 @@
 | You want the current headline: Spark vs AMD Strix Halo (Vulkan, ROCm) vs hosted Terra on gpt-oss-120b | [eval-report-2026-09-spark-halo-terra.md](eval-report-2026-09-spark-halo-terra.md) | **latest** (Sept 13, 2026) |
 | You need Spark/Terra detail: per-tag and per-company tables, the 20b model, every miss itemised, cost | [eval-report-2026-09-spark-cuda-rerun.md](eval-report-2026-09-spark-cuda-rerun.md) | current for the Spark and Terra columns |
 | You want Qwen3.8-27B on the same Spark suite, including why it was ~5× slower than gpt-oss-120b | [eval-report-2026-09-spark-cuda-qwen.md](eval-report-2026-09-spark-cuda-qwen.md) | Qwen add-on (Sept 15, 2026) |
+| You want Qwen3.8-27B on a single RTX 5090 (Windows, CUDA): the 131K replication and the native-262K run that recovers Goldman Sachs | [eval-report-2026-09-rtx5090-cuda-qwen.md](eval-report-2026-09-rtx5090-cuda-qwen.md) | Qwen on RTX 5090 (Sept 15, 2026) |
 | You want the pre-fix run and the explanation of what the harness fixes changed | [eval-report-2026-09-spark-cuda.md](eval-report-2026-09-spark-cuda.md) | superseded; kept for the cross-check |
 
 Each number has one home: the Halo report owns the AMD columns, the re-run owns the Spark and
