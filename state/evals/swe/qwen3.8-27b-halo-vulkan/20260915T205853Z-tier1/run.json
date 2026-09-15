@@ -1,0 +1,96 @@
+{
+  "suite": "swe",
+  "task": "tier1",
+  "model": "qwen3.8-27b",
+  "started": "2026-09-15T20:58:53+00:00",
+  "finished": "2026-09-15T22:36:41+00:00",
+  "provenance": {
+    "timestamp": "2026-09-15T20:58:53+00:00",
+    "hostname": "Mike-PC",
+    "machine": "x86_64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": null,
+    "build_id": null,
+    "binary_version": null,
+    "gpu": {},
+    "platform": "halo",
+    "backend": "vulkan",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "total_slots": 4,
+    "model_path": "C:\\Users\\Mike\\AppData\\Local\\local-llm\\models\\unsloth__Qwen3.8-27B-GGUF\\Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "chat_template_sha": "12827f24b742",
+    "build_info": "b10919-d3146f2b5"
+  },
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 8084,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": null,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": null,
+    "hf_ref": "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_XL",
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0
+  },
+  "task_config": {
+    "tool": "evalplus",
+    "version": "0.3.1",
+    "datasets": [
+      "humaneval",
+      "mbpp"
+    ],
+    "repo": null,
+    "ref": null,
+    "exercises_repo": null,
+    "exercises_ref": null,
+    "edit_format": null,
+    "dataset": null,
+    "limit": null,
+    "seed": null,
+    "instances": [],
+    "workers": null,
+    "step_limit": null,
+    "max_new_tokens": 4096
+  },
+  "config_hash": "9b64a39f28ab",
+  "tools": {
+    "evalplus": "evalplus==0.3.1",
+    "evalplus_max_new_tokens": "4096"
+  },
+  "summary": {
+    "n": 542,
+    "score": 0.7749077490774908,
+    "by_dataset": {
+      "humaneval": {
+        "n": 164,
+        "score": 0.8597560975609756,
+        "base_pass_at_1": 0.866,
+        "plus_pass_at_1": 0.86,
+        "skipped": 0
+      },
+      "mbpp": {
+        "n": 378,
+        "score": 0.7380952380952381,
+        "base_pass_at_1": 0.857,
+        "plus_pass_at_1": 0.738,
+        "skipped": 0
+      }
+    },
+    "skipped": 0,
+    "commands": "see run.json tools; logs under work-tier1/"
+  },
+  "n_results": 542,
+  "format": "runrecord/1",
+  "model_label": "qwen3.8-27b-halo-vulkan"
+}
