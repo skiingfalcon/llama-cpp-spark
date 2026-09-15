@@ -1,0 +1,242 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "qwen3.8-27b",
+  "started": "2026-09-15T02:47:45+00:00",
+  "finished": "2026-09-15T04:52:55+00:00",
+  "provenance": {
+    "timestamp": "2026-09-15T02:47:45+00:00",
+    "hostname": "spark-780e",
+    "machine": "aarch64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": "82d6bb284d1f",
+    "build_id": "121a-real",
+    "binary_version": null,
+    "gpu": {
+      "name": "NVIDIA GB10",
+      "driver_version": "580.173.02",
+      "compute_cap": "12.1",
+      "memory.total": "[N/A]",
+      "memory.used": "[N/A]",
+      "clocks.sm": "2411",
+      "clocks.mem": "[N/A]",
+      "temperature.gpu": "61",
+      "power.draw": "13.70"
+    },
+    "platform": "spark",
+    "backend": "cuda",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "total_slots": 4,
+    "model_path": "/opt/models/unsloth__Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "chat_template_sha": "12827f24b742",
+    "build_info": "b869-82d6bb284"
+  },
+  "runtime": {
+    "host": "0.0.0.0",
+    "port": 8084,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": null,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": "/opt/models/unsloth__Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 4096,
+    "reasoning_effort": null
+  },
+  "task_config": {
+    "scoring_version": "2026-09-13.1",
+    "no_document": false,
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      {
+        "tag": "Revenues",
+        "label": "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "RegulatedAndUnregulatedOperatingRevenue",
+          "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "RevenueFromContractWithCustomerIncludingAssessedTax",
+          "SalesRevenueNet"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "NetIncomeLoss",
+        "label": "net income (loss) attributable to the company",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "ProfitLoss",
+          "NetIncomeLossAvailableToCommonStockholdersBasic"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "OperatingIncomeLoss",
+        "label": "operating income (loss)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "EarningsPerShareDiluted",
+        "label": "diluted earnings per share",
+        "kind": "duration",
+        "unit": "USD/shares",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "NetCashProvidedByUsedInOperatingActivities",
+        "label": "net cash provided by operating activities",
+        "kind": "ytd",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Assets",
+        "label": "total assets",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Liabilities",
+        "label": "total liabilities",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "StockholdersEquity",
+        "label": "total stockholders' equity attributable to the company",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "CashAndCashEquivalentsAtCarryingValue",
+        "label": "cash and cash equivalents",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "LongTermDebtNoncurrent",
+        "label": "long-term debt, excluding the current portion",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "LongTermDebtAndCapitalLeaseObligations"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "CommonStockSharesOutstanding",
+        "label": "common shares outstanding",
+        "kind": "instant",
+        "unit": "shares",
+        "aliases": [
+          "EntityCommonStockSharesOutstanding"
+        ],
+        "accept_aliases": false
+      }
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "455128a4cdd6",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "scored": 121,
+    "correct": 116,
+    "score": 0.9586776859504132,
+    "skipped": 0,
+    "errors": 0,
+    "off_by_scale": 0,
+    "truncated": 1,
+    "ttft_p50_s": 8.597287204989698,
+    "ttft_p95_s": 116.12905288097681,
+    "total_p50_s": 35.511997774010524,
+    "total_p95_s": 196.1540813149768,
+    "prompt_tps_p50": 280.2835238276876,
+    "decode_tps_p50": 9.76165862310937,
+    "total_tokens": 10371887,
+    "cached_prompt_tokens": 8762395,
+    "reasoning_tokens": 43613,
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 116
+      }
+    },
+    "by_mode": {
+      "full": {
+        "n": 93,
+        "correct": 93
+      },
+      "chunked": {
+        "n": 8,
+        "correct": 3
+      },
+      "section": {
+        "n": 20,
+        "correct": 20
+      }
+    },
+    "fallback": 28
+  },
+  "n_results": 121,
+  "format": "runrecord/1",
+  "model_label": "qwen3.8-27b-spark-cuda"
+}

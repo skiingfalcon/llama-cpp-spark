@@ -3,7 +3,9 @@
 > **Latest headline is elsewhere:** the AMD Strix Halo comparison in
 > [eval-report-2026-09-spark-halo-terra.md](eval-report-2026-09-spark-halo-terra.md) adds two
 > local stacks to these numbers. This report remains the detailed source for the Spark and
-> Terra columns (per-tag / per-company tables, the 20b model, itemised misses).
+> Terra columns (per-tag / per-company tables, the 20b model, itemised misses). Qwen3.8-27B
+> on this same Spark suite is in
+> [eval-report-2026-09-spark-cuda-qwen.md](eval-report-2026-09-spark-cuda-qwen.md).
 
 Re-run of the three-model comparison after the harness fixes documented in
 [the first report](eval-report-2026-09-spark-cuda.md#what-changed-since-this-run). Keep both documents:

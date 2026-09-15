@@ -41,6 +41,15 @@ n_gpu_layers = 70
 port = 8082
 extra_args = ["--jinja"]
 
+[models."qwen3.8-27b"]
+# Dense 27B VL (arch qwen35), native 262K ctx; text backbone via -hf repo:quant.
+repo = "unsloth/Qwen3.8-27B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8084
+extra_args = ["--jinja"]
+
 [models.mistral-7b-instruct]
 # Local file only (no repo): place it in models_dir yourself.
 file = "mistral-7b-instruct.Q4_K_M.gguf"
