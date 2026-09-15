@@ -13,8 +13,9 @@ wheels/
 # llama.cpp vendor build (cloned + compiled locally)
 vendor/
 
-# Local model copies (the shared store lives outside the repo: /opt/models or %LOCALAPPDATA%)
-models/
+# Local model copies (the shared store lives outside the repo: /opt/models or %LOCALAPPDATA%).
+# Root only: docs/models/ holds the model reference cards and must be tracked.
+/models/
 *.gguf
 
 # Eval corpora and cloned external harnesses (regenerate with local-llm eval …)
