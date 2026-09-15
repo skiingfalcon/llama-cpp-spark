@@ -45,7 +45,7 @@ chunk_tokens = 8000          # extract-chunked: chunk size in model tokens
 top_k = 6                    # extract-chunked: BM25 chunks placed in context
 tolerance = 0.005            # numeric match: relative tolerance (0.5 %)
 max_input_tokens = 0         # 0 = whatever the served ctx allows
-perf_lengths = [8192, 32768, 65536, 100000]
+perf_lengths = [8192, 32768, 65536, 100000, 200000]  # >131K only runs when the served ctx allows
 
 # Ground truth: XBRL company facts (data.sec.gov/api/xbrl/companyfacts). kind:
 #   instant  -> balance-sheet value at the period end

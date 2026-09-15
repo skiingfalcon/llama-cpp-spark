@@ -57,6 +57,10 @@ class SecRunOptions:
     # Memorisation control: ask the same questions with no filing in context. A model that
     # scores well here is recalling public XBRL facts, not reading the document.
     no_document: bool = False
+    # Cap on prompt tokens regardless of the served context (0/None = served ctx). Lets a
+    # 1M-context model be scored under the same 131K budget as the others, and separately
+    # unconstrained, so context-window effects are measured rather than mixed in.
+    max_input_tokens: int | None = None
 
 
 def task_label(opts: SecRunOptions) -> str:
@@ -211,15 +215,24 @@ def _ask(ep: Endpoint, cfg: EvalConfig, system: str, user: str) -> ChatResult:
 
 
 def apply_quality_overrides(cfg: EvalConfig, opts: SecRunOptions) -> EvalConfig:
-    """CLI overrides for [quality]; they flow into the context budget and config_hash."""
+    """CLI overrides for [quality] and the input budget; they flow into the context budget
+    and config_hash."""
     updates: dict[str, Any] = {}
     if opts.max_tokens is not None:
         updates["max_tokens"] = opts.max_tokens
     if opts.reasoning_effort is not None:
         updates["reasoning_effort"] = opts.reasoning_effort or None
-    if not updates:
+    sec_updates: dict[str, Any] = {}
+    if opts.max_input_tokens is not None:
+        sec_updates["max_input_tokens"] = opts.max_input_tokens
+    if not updates and not sec_updates:
         return cfg
-    return cfg.model_copy(update={"quality": cfg.quality.model_copy(update=updates)})
+    return cfg.model_copy(
+        update={
+            "quality": cfg.quality.model_copy(update=updates),
+            "sec": cfg.sec.model_copy(update=sec_updates),
+        }
+    )
 
 
 def _budget(n_ctx: int | None, cfg: EvalConfig, question_tokens: int) -> int | None:
@@ -618,6 +631,7 @@ def run_sec_task(settings: Settings, cfg: EvalConfig, model: str, opts: SecRunOp
         task_config={
             "scoring_version": SCORING_VERSION,
             "no_document": opts.no_document,
+            "max_input_tokens": cfg.sec.max_input_tokens,  # 0 = served ctx
             "chunk_tokens": cfg.sec.chunk_tokens,
             "top_k": cfg.sec.top_k,
             "tolerance": cfg.sec.tolerance,

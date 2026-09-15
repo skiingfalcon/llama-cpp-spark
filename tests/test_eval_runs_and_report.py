@@ -288,3 +288,8 @@ def test_quality_overrides_flow_into_config() -> None:
     assert cfg.quality.max_tokens == 4096  # original untouched
     forced = apply_quality_overrides(cfg, SecRunOptions(task="extract-full", reasoning_effort=""))
     assert forced.quality.reasoning_effort is None
+    capped = apply_quality_overrides(
+        cfg, SecRunOptions(task="extract-full", max_input_tokens=131072)
+    )
+    assert capped.sec.max_input_tokens == 131072 and cfg.sec.max_input_tokens == 0
+    assert capped.quality.max_tokens == cfg.quality.max_tokens  # untouched

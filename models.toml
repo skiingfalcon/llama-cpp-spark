@@ -57,3 +57,28 @@ kind = "chat"
 ctx_size = 8192
 port = 8083
 extra_args = ["--jinja"]
+
+[models.nemotron-3-super]
+# NVIDIA Nemotron-3-Super-120B-A12B: hybrid Mamba-2 / latent-MoE / attention, 120B total,
+# ~12.7B active, native 1M context, NoPE (no RoPE scaling needed). Use the ggml-org GGUF;
+# Ollama's blobs pack expert tensors differently and fail to load in upstream llama.cpp.
+# Needs llama.cpp >= March 2026 (Nemotron-3 support); the pin in LLAMA_CPP_VERSION qualifies.
+#
+# Context budget. Only the 8 attention layers keep a KV cache (2 KV heads x 128 dims):
+#   8 KiB/token at f16  ->  262144 ctx = 2 GiB, 524288 = 4 GiB, 1048576 = 8 GiB
+#   (halve with cache_type_k/v = "q8_0"). Weights are 69.9 GB, so even 1M fits in 128 GB.
+# Default 524288 so the largest 10-K (GS, ~242K gpt-oss tokens, more with this tokenizer)
+# is read whole with no section fallback. Override per serve: `local-llm serve
+# nemotron-3-super --ctx-size 1048576`, or cap the eval only: `eval sec run ... --max-input-tokens
+# 131072` to score it under the same budget as gpt-oss.
+# Tip: drop the page cache before the first load of a 70 GB file on the Spark
+# (`sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'`) or the load can OOM.
+repo = "ggml-org/nemotron-3-super-120b-GGUF"
+file = "Nemotron-3-Super-120B-Q4_K.gguf"
+kind = "chat"
+ctx_size = 524288
+n_parallel = 1          # llama-server splits --ctx-size across slots; keep the whole window on one
+port = 8085
+extra_args = ["--jinja"]
+# NVIDIA's serving defaults (tool-calling profile). Evals pin temperature 0 / seed 42 regardless.
+sampling = { temp = 0.6, top_p = 0.95 }

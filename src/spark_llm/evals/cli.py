@@ -101,6 +101,12 @@ def sec_run(
         "--no-document",
         help="Memorisation control: same questions, no filing in context (task <name>-nodoc)",
     ),
+    max_input_tokens: int | None = typer.Option(
+        None,
+        "--max-input-tokens",
+        help="Cap prompt tokens below the served context (evals.toml [sec].max_input_tokens); "
+        "e.g. 131072 to score a 1M-ctx model under the same budget as the others",
+    ),
 ) -> None:
     """Run a SEC task against the served model; results under state/evals/sec/."""
     settings = get_settings()
@@ -121,6 +127,7 @@ def sec_run(
             max_tokens=max_tokens,
             reasoning_effort=reasoning_effort,
             no_document=no_document,
+            max_input_tokens=max_input_tokens,
         )
         try:
             rec = run_sec_task(settings, cfg, model, opts)

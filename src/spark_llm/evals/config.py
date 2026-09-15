@@ -59,7 +59,7 @@ class SecSuite(BaseModel):
     top_k: int = 6
     tolerance: float = 0.005
     max_input_tokens: int = 0  # 0 = model's served ctx
-    perf_lengths: list[int] = Field(default_factory=lambda: [8192, 32768, 65536, 100000])
+    perf_lengths: list[int] = Field(default_factory=lambda: [8192, 32768, 65536, 100000, 200000])
     xbrl_tags: list[XbrlTag] = Field(default_factory=list)
     financebench: FinanceBenchSettings = Field(default_factory=FinanceBenchSettings)
 

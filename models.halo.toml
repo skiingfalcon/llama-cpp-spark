@@ -53,3 +53,16 @@ kind = "chat"
 ctx_size = 131072
 port = 8082
 extra_args = ["--jinja", "--no-mmap"]
+
+[models.nemotron-3-super]
+# Same model/port as models.toml; see the notes there. KV cache is tiny (8 KiB/token f16), so
+# 524288 context costs ~4 GiB on top of the 69.9 GB weights: fits in a 96 GB VGM allocation.
+# Native llama-server path only (LM Studio has its own model catalogue).
+repo = "ggml-org/nemotron-3-super-120b-GGUF"
+file = "Nemotron-3-Super-120B-Q4_K.gguf"
+kind = "chat"
+ctx_size = 524288
+n_parallel = 1
+port = 8085
+extra_args = ["--jinja", "--no-mmap"]
+sampling = { temp = 0.6, top_p = 0.95 }

@@ -336,6 +336,42 @@ extra_args = ["--jinja"]
 
 Argv is merged in layers: **defaults ← kind flags ← per-model overrides ← CLI flags**.
 
+### Context window: making the most of it
+
+Three knobs decide how much of a document a model can read, and they are independent:
+
+| Knob | Where | What it does |
+| --- | --- | --- |
+| `ctx_size` / `--ctx-size` | registry entry, or per serve | The window llama-server allocates. KV memory grows with it; `n_parallel` slots **split** it, so keep `n_parallel = 1` when one long document matters more than concurrency. |
+| `cache_type_k` / `cache_type_v = "q8_0"` | registry entry | Halves KV memory for a small precision cost. Only worth it on models whose KV is large (gpt-oss: ~all layers attend). |
+| `--max-input-tokens N` | `local-llm eval sec run` | Caps the **eval's** prompt budget below the served window. Score a 1M-context model at 131072 to compare it fairly with the others, then again unconstrained to measure what the window buys. Recorded in `task_config` and the config hash. |
+
+The extract task degrades per filing (whole → Item 8 → BM25 chunks) when the budget is too
+small, and the Qwen run showed the chunk rung costs accuracy. A window large enough to read
+every filing whole removes that variable. `eval sec perf` sweeps up to 200K tokens when the
+served context allows, so measure prefill at the lengths you intend to use before an
+overnight run.
+
+**Worked example: `nemotron-3-super`** (registered in both registries, port 8085). Its hybrid
+architecture keeps a KV cache on only 8 of 88 layers, about 8 KiB per token, so a 524288 window
+costs 4 GiB and the full 1M costs 8 GiB on top of 69.9 GB of weights. The registry default is
+524288, which reads the largest 10-K whole:
+
+```bash
+uv run local-llm download nemotron-3-super
+sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'      # Spark: free page cache before a 70 GB load
+uv run local-llm serve nemotron-3-super                       # 524288 ctx from models.toml
+uv run local-llm serve nemotron-3-super --ctx-size 1048576    # or the full window
+uv run local-llm eval sec perf nemotron-3-super               # prefill/decode up to 200K tokens
+uv run local-llm eval sec run nemotron-3-super --task extract-full --forms 10-K --max-input-tokens 131072  # same budget as gpt-oss
+uv run local-llm eval sec run nemotron-3-super --task extract-full --forms 10-K                           # unconstrained
+```
+
+Use the ggml-org GGUF named in the registry; Ollama's Nemotron blobs pack expert tensors
+differently and fail with a `ffn_down_exps ... wrong shape` error in upstream llama.cpp. The
+model reasons through `<think>` tokens that llama-server exposes as `reasoning_content`, which
+the harness already captures and budgets for.
+
 ### Escape hatches (no registry entry needed)
 
 ```bash
@@ -527,6 +563,8 @@ PIDs and logs live under `state/`.
 | Halo: model loads partly on CPU, very slow | Variable Graphics Memory too low | Adrenalin → Performance → Tuning → set VGM ≥ 96 GB, reboot |
 | Halo: `rocm build lists no GPU device` | Official zip lacks gfx1151 or driver older than its HIP runtime | Update Adrenalin (≥ 26.6.4) or `local-llm build --backend rocm --source lemonade --force` |
 | Halo: Vulkan `DeviceLost` at 65–80K context | Micro-batch too large for the driver | Keep `ubatch_size = 512` (models.halo.toml default); try `--backend rocm` |
+| `tensor 'blk.N.ffn_down_exps.weight' has wrong shape` | GGUF from Ollama, or a llama.cpp build older than the model's support | Use the GGUF named in the registry (ggml-org / unsloth); rebuild at the pinned commit |
+| Load of a 60–70 GB model OOMs on the Spark | Page cache holding the previous model | `sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'`, then serve again |
 
 ## Project layout
 
