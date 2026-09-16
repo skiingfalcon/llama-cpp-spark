@@ -12,7 +12,9 @@ from spark_llm.evals.endpoint import percentile
 # -- evalplus (tier 1) -------------------------------------------------------------------------
 
 # evalplus prints "humaneval (base tests)" then "humaneval+ (base + extra tests)"; allow the "+".
-_PASS_AT_1 = re.compile(r"^(?P<ds>\w+)\+?\s*\((?P<which>base tests|base \+ extra tests)\)\s*$", re.M)
+_PASS_AT_1 = re.compile(
+    r"^(?P<ds>\w+)\+?\s*\((?P<which>base tests|base \+ extra tests)\)\s*$", re.M
+)
 _SCORE = re.compile(r"pass@1:\s*(?P<v>[0-9.]+)")
 
 
