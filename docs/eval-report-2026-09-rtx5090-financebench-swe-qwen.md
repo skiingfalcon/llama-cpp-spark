@@ -41,9 +41,13 @@ are in the same branch as the run folders.
   report; `server.build_info` is authoritative):
   - FinanceBench: [`state/evals/sec/qwen3.8-27b-halo-vulkan/20260915T171214Z-qa-financebench/`](../state/evals/sec/qwen3.8-27b-halo-vulkan/20260915T171214Z-qa-financebench/)
   - Tier 1, reasoning off: [`state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T183613Z-tier1/`](../state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T183613Z-tier1/)
-    (`run.json` timestamps span 0.1 min because this record was regenerated from the saved
-    generations after the parser fix; generation itself took about 26 min)
+    (`run.json` timestamps span 4 s because this record was regenerated from the saved
+    generations after the parser fix; the first pass, whose record had `n=0`, took about 26 min
+    of wall clock, observed but not recorded)
   - Tier 1, reasoning on: [`state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T205853Z-tier1/`](../state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T205853Z-tier1/)
+  - Each tier-1 folder has an `evalplus/` subfolder with evalplus's own per-problem result files
+    (solution text, base and plus status) and `empty_solutions.json`, the task ids whose returned
+    content was empty. `results.jsonl` alone does not carry solutions.
 
 ## FinanceBench
 
@@ -53,7 +57,7 @@ are in the same branch as the run folders.
 | of which `metrics-generated` (pure calculation) | 50 | 0 | **46 (92%)** |
 | of which `domain-relevant` / `novel-generated` bucketed as numeric | 24 | 7 | 14 |
 | Free-text answers (need the judge) | 76 | unscored | unscored |
-| Answered "the excerpts do not contain the answer" | 23 of 150 | | |
+| Abstained (answer contains `unknown` or an explicit "does not state/contain/provide" phrase) | 20 of 150 | | |
 
 **The 9.5% is a scorer artifact.** The FinanceBench prompt asks for "one or two sentences", and
 the harness grades those sentences with the 10-K extractor: first number in the reply, 1%
@@ -81,28 +85,38 @@ Latency: p50 4.7 s per question, 21 minutes for 150, decode 75 t/s on these shor
 | MBPP base pass@1 | **89.2%** (337/378) | 85.7% (324/378) |
 | MBPP+ pass@1 | **76.5%** (289/378) | 73.8% (279/378) |
 | Empty solutions | 0 / 542 | **68 / 542** (20 HumanEval, 48 MBPP) |
-| Wall clock | ~26 min | 98 min |
+| Wall clock | ~26 min (observed, see Artifacts) | 98 min |
 
-**Thinking hurt, and every lost point is a blank.** With reasoning on, 68 of 542 problems ended
-with `finish_reason=length` and no code: the model spent the entire 4,096-token budget inside
-its hidden reasoning. Reproduced by hand on HumanEval/10 (`make_palindrome`): 14,800 characters
-of reasoning, still deliberating about KMP prefix functions when the budget ran out. Excluding
-the blanks, the reasoning-on solutions pass at about the same rate as the reasoning-off ones,
-so the extra thinking bought nothing on problems this size. Reasoning off had no truncations at
-all under evalplus's 768-token default.
+Pass counts follow evalplus's printed pass@1, which counts a problem as passing plus only if it
+also passes base. Two MBPP problems (Mbpp/635, Mbpp/787) pass the plus tests but fail base, so
+the harness's per-problem `correct` field (plus status alone) gives 291/378 for the reasoning-off
+run in `results.jsonl`; the table uses 289.
+
+**Thinking hurt, and every lost point is a blank.** With reasoning on, 68 of 542 problems came
+back with empty content (`evalplus/empty_solutions.json`). evalplus does not store
+`finish_reason`, so the mechanism is inferred: it is consistent with the 4,096-token budget being
+consumed by hidden reasoning, and was reproduced by hand on HumanEval/10 (`make_palindrome`),
+which returned `finish_reason=length` after 14,800 characters of reasoning and no code.
+
+On the 474 problems both runs answered, thinking **helped**: HumanEval base 142/144 vs 139/144,
+HumanEval+ 141 vs 137, MBPP base 324/330 vs 306/330, MBPP+ 279 vs 270, a 2–5 point edge for
+reasoning on. The blanks more than erased it: the reasoning-off run solved 45 of the 68 problems
+reasoning-on left empty (14 of 20 HumanEval, 31 of 48 MBPP). Reasoning off had no truncations
+under evalplus's 768-token default.
 
 This is the same failure the extraction suite showed on a smaller scale (one HD share-count
 question spent all 4,096 tokens reasoning) and the opposite of the Spark report's hope that a
 model which "reads carefully and thinks long" would pull ahead on harder tasks. On function-level
-coding it is a strong direct answerer and a weak deliberator.
+coding it is a strong direct answerer whose deliberation, when it finishes, is a little better
+still, but which cannot be relied on to finish inside 4,096 tokens.
 
 ## What this says
 
 - **Qwen3.8-27B without thinking is a good local coder:** HumanEval+ 90.9% and MBPP+ 76.5% in
   under half an hour on a consumer card, no truncations.
 - **Turn thinking off for short-answer tasks** unless the budget is raised well past 4,096 or a
-  thinking budget is imposed server-side (`--reasoning-budget`). The eval and the model's own
-  verbosity are otherwise in conflict.
+  thinking budget is imposed server-side (`--reasoning-budget`). Thinking is worth 2–5 points
+  where it completes; at 4,096 it fails to complete one problem in eight.
 - **FinanceBench separates nothing yet.** Until the numeric scorer handles sentence answers and
   the judge runs, its headline number is unusable; the pure-calculation half suggests ~90%.
 - Nothing here is comparable to gpt-oss-120b yet; neither suite has a Spark run. The Spark rows
@@ -140,10 +154,12 @@ Found while running these suites; fixes for 1–3 are committed alongside the ru
 ## Caveats
 
 > **Review notes (2026-09-15).** Single run per row. The FinanceBench numbers are numeric-only
-> and rescored outside the harness; the 76 free-text answers await a judge pass (they are in
-> `results.jsonl`). The two tier-1 rows differ in two variables (reasoning on/off and 768 vs 4096
-> budget), chosen because reasoning on cannot run at 768; the blank-answer analysis, not the
-> headline delta, is the finding. The reasoning-on run was interrupted twice (a WSL loopback
+> and rescored outside the harness (the lenient rule moves by ±2 depending on how a zero
+> reference and percent scaling are treated); the 76 free-text answers await a judge pass (they
+> are in `results.jsonl`). The two tier-1 rows differ in two variables (reasoning on/off and 768 vs
+> 4096 budget), chosen because reasoning on cannot run at 768; the blank-answer analysis, not the
+> headline delta, is the finding. `finish_reason` is not stored by evalplus, so "budget spent in
+> reasoning" rests on empty content plus one by-hand reproduction. The reasoning-on run was interrupted twice (a WSL loopback
 > failure and a session restart) and resumed from saved generations both times; generations are
 > greedy, so resumption does not change the answers. No `--no-document` control for FinanceBench.
 
@@ -159,6 +175,7 @@ uv run local-llm stop
 # WSL2 Ubuntu (mirrored networking so 127.0.0.1 reaches the Windows server), same branch:
 LOCAL_LLM_PLATFORM=halo uv run local-llm eval swe check qwen3.8-27b
 LOCAL_LLM_PLATFORM=halo uv run local-llm eval swe run qwen3.8-27b --tier 1     # 4096 budget from evals.toml
-# reasoning off: serve the qwen3.8-27b-code entry (adds --reasoning off) and move
-# state/evals/swe/qwen3.8-27b/work-tier1 aside before the second run.
+# reasoning off (the 768-budget row): serve the qwen3.8-27b-code entry (adds --reasoning off),
+# comment out max_new_tokens in evals.toml, and move state/evals/swe/qwen3.8-27b/work-tier1
+# aside first, or evalplus resumes from the previous run's generations.
 ```

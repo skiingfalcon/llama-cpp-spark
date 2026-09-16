@@ -78,3 +78,16 @@ ctx_size = 131072
 port = 8084
 ubatch_size = 2048
 extra_args = ["--jinja"]
+
+[models."qwen3.8-27b-code"]
+# Same weights as qwen3.8-27b with reasoning off (--reasoning off). Used for the tier-1
+# "reasoning off" row in docs/eval-report-2026-09-rtx5090-financebench-swe-qwen.md and for editor
+# use, where the first token should arrive immediately. Same port, so only one of the two runs at
+# a time.
+repo = "unsloth/Qwen3.8-27B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8084
+ubatch_size = 2048
+extra_args = ["--jinja", "--reasoning", "off"]

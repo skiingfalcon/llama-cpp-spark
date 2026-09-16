@@ -20,10 +20,11 @@ RTX 5090 (32 GB)** under Windows 11, CUDA llama.cpp release `b10919`:
 | DGX Spark, gpt-oss-20b (MoE) | 87.6% | 94/104 | — | 40–60 s | 19 min | $0 marginal |
 
 Rows other than the two RTX 5090 rows are copied from the September 15 summary and the reports
-it links. Single run per row; the bootstrap 95% intervals in
-[`state/evals/report-sec.md`](../state/evals/report-sec.md) overlap for the top four local rows
-(RTX 5090 262K: 0.96–1.00; Spark 120b: 0.96–1.00; Spark Qwen: 0.92–0.99), so read gaps of one
-or two questions as noise.
+it links. Single run per row; percentile-bootstrap 95% intervals (the harness's `bootstrap_ci`
+over `results.jsonl`) overlap for the top four local rows (RTX 5090 262K: 0.96–1.00; RTX 5090
+131K: 0.89–0.98; Spark 120b: 0.96–1.00; Spark Qwen: 0.92–0.99), so read gaps of one or two
+questions as noise. `state/evals/report-sec.md` is deliberately not regenerated on this branch:
+the generator would file these runs under halo/vulkan (see the CLI note below).
 
 "When the filing fits" is scored on the 10 filings gpt-oss read whole (104 questions), so the
 column is comparable across tokenizers. "Cold prefill" is time to first token on the first
@@ -42,8 +43,9 @@ the largest whole document in run 2 (STWD, 202K tokens) took 132 s cold.
   its `cudart` zip (the release has no CUDA 13.4 x64 zip). Weights: the same 17.6 GB
   `Qwen3.8-27B-UD-Q4_K_XL.gguf`. `--n-gpu-layers 999 --flash-attn on --batch-size 2048
   --ubatch-size 2048 --jinja`.
-  - Run 1: `--ctx-size 131072`, f16 KV. ~26 GB VRAM in use by the server.
-  - Run 2: `--ctx-size 262144 --cache-type-k q8_0 --cache-type-v q8_0`. ~28 GB VRAM.
+  - Run 1: `--ctx-size 131072`, f16 KV. ~26 GB VRAM in use by the server (nvidia-smi, observed;
+    not recorded in run.json).
+  - Run 2: `--ctx-size 262144 --cache-type-k q8_0 --cache-type-v q8_0`. ~28 GB VRAM (observed).
 - **CLI note:** this box runs the `halo` (Windows) platform code with `LOCAL_LLM_LLAMA_BIN_DIR`
   pointing at the CUDA zip, so both runs are labelled `halo-vulkan` in `run.json` and the GPU
   field shows the machine's AMD iGPU. `server.build_info` (`b10919-d3146f2b5`) and
@@ -68,8 +70,11 @@ the largest whole document in run 2 (STWD, 202K tokens) took 132 s cold.
 Three readings:
 
 - **The Goldman misses were a context cap, as the Spark report inferred.** At 262K the harness
-  kept GS on the Item 8 path: the section is **131,589 Qwen tokens**, 517 over the 131,072
-  window, which is exactly why it fell to chunks at 131K. In section mode GS scored **8/8**,
+  kept GS on the Item 8 path. The section is **131,589 Qwen tokens**; at 131K the harness's input
+  budget is about 126.7K (window minus the 4,096-token completion budget, a 256-token overhead and
+  the question), so Item 8 missed the budget by roughly 4.9K tokens and fell to chunks. At 262K
+  the budget is ~257.8K: the section fits, the whole filing (273K) still does not. In section
+  mode GS scored **8/8**,
   including the four values the chunked path got wrong and the operating-cash-flow sign error
   shared by all three local models.
 - **NEE and STWD moved from Item 8 to whole-document** at 262K (137.5K and 202.4K tokens) and
@@ -145,10 +150,12 @@ Wall clock equals summed request time to within 0.1 min in all three runs (seria
 
 1. **Bandwidth.** The Spark report attributed Qwen's 10 t/s to a dense model reading all ~17 GB
    of weights per token on a bandwidth-bound GPU. The RTX 5090 has roughly 6× the GB10's memory
-   bandwidth and decodes the same checkpoint at **55–60 t/s**, i.e. about twice gpt-oss-120b's
+   bandwidth by published specification (~1.8 TB/s vs ~273 GB/s; not measured here) and decodes
+   the same checkpoint at **55–60 t/s**, i.e. about twice gpt-oss-120b's
    30 t/s on the Spark. Same architectural floor, different ceiling.
-2. **Prefill.** Cold prompt throughput is 2,100–3,100 t/s on the 5090 vs 610–740 t/s on the
-   Spark (~4×). A ~120K filing prefills in 54–58 s instead of 203 s.
+2. **Prefill.** Cold prompt throughput is 2,300–3,200 t/s on the 5090 for the 50–122K filings
+   (1,500–2,000 t/s for the 130–200K documents read whole in run 2) vs 610–740 t/s on the Spark
+   (~4×). A ~120K filing prefills in 54–58 s instead of 203 s.
 3. **Reasoning is unchanged.** p50 hidden reasoning per question is 224–244 tokens across all
    three runs (Spark 227); totals 35.5k–43.6k. The model is not thinking less on the 5090, it is
    just emitting faster.
@@ -160,9 +167,9 @@ Wall clock equals summed request time to within 0.1 min in all three runs (seria
 
 | Row | Wall clock | Request time | TTFT p50 | Cold TTFT p50 | Total p50 / p95 | Prompt tok | Cached | Reasoning |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Spark Qwen (131K) | 125 min | 125 min | 8.6 s | 121 s | 36 s / 196 s | 10.37 M | 84% | 43.6 k |
-| **RTX 5090 run 1 (131K)** | **22.5 min** | **22.4 min** | **1.27 s** | **30 s** | **5.6 s / 41 s** | **10.37 M** | **84%** | **41.9 k** |
-| **RTX 5090 run 2 (262K)** | **24.3 min** | **24.2 min** | **1.44 s** | **45 s** | **6.2 s / 43 s** | **12.77 M** | **88%** | **35.5 k** |
+| Spark Qwen (131K) | 125 min | 125 min | 8.6 s | 121 s | 36 s / 196 s | 10.33 M | 85% | 43.6 k |
+| **RTX 5090 run 1 (131K)** | **22.5 min** | **22.4 min** | **1.27 s** | **30 s** | **5.6 s / 41 s** | **10.33 M** | **85%** | **41.9 k** |
+| **RTX 5090 run 2 (262K)** | **24.3 min** | **24.2 min** | **1.44 s** | **45 s** | **6.2 s / 43 s** | **12.73 M** | **88%** | **35.5 k** |
 
 ## Pros and cons
 
@@ -170,7 +177,8 @@ Wall clock equals summed request time to within 0.1 min in all three runs (seria
 
 **Pros**
 
-- 98.3%, tying gpt-oss-120b on the Spark and one question behind hosted Terra, in 24 minutes.
+- 98.3%, matching gpt-oss-120b's 119/121 on the Spark (single runs, overlapping intervals) and
+  one question behind hosted Terra, in 24 minutes.
 - Goldman Sachs 8/8 on the Item 8 path; nothing fell to BM25 chunks.
 - Fits a single 32 GB consumer card with ~3 GB to spare (17.6 GB weights + q8_0 KV for 262K).
 - No scale errors, no truncations.
@@ -233,7 +241,8 @@ uv run local-llm eval report --suite sec
 ## Bottom line for the team
 
 - **The Spark report's hypothesis is confirmed:** the five Goldman misses were the 131K cap, not
-  the model. At 262K Qwen scores **119/121 (98.3%)**, level with gpt-oss-120b.
+  the model. At 262K Qwen scores **119/121 (98.3%)**, indistinguishable from gpt-oss-120b's
+  119/121 at this sample size.
 - **Dense-model slowness was a Spark property, not a Qwen property.** On an RTX 5090 the same
   checkpoint runs the suite in **23–24 minutes**, in line with 120b on the Spark (26 min), with
   decode at 55–60 t/s.

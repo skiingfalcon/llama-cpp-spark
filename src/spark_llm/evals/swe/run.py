@@ -143,7 +143,8 @@ def run_tier1(
                     "main()",
                 ]
             )
-            cmd[3:4] = ["python", "-c", shim]
+            i = cmd.index("evalplus.evaluate")
+            cmd[i : i + 1] = ["python", "-c", shim]
             writer.record.tools["evalplus_max_new_tokens"] = str(tier.max_new_tokens)
         out = _run(cmd, cwd=work, env=env, dry=opts.dry_run, log=work / f"{ds}.log")
         results, summary = normalize_evalplus(work, ds, out)

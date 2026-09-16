@@ -45,6 +45,42 @@ def test_evalplus(tmp_path: Path) -> None:
     assert summary["plus_pass_at_1"] == 0.799
 
 
+EVALPLUS_031_STDOUT = """
+Computing expected output...
+Expected outputs computed in 7.75s
+Reading samples...
+humaneval (base tests)
+pass@1:	0.933
+humaneval+ (base + extra tests)
+pass@1:	0.909
+"""
+
+
+def test_evalplus_031_layout(tmp_path: Path) -> None:
+    """evalplus 0.3.1 prints 'humaneval+' for the plus header and names the results file
+    '<model>_<backend>_temp_<t>_eval_results.json'; both must be picked up."""
+    assert parse_evalplus_stdout(EVALPLUS_031_STDOUT) == {
+        "humaneval_base": 0.933,
+        "humaneval_plus": 0.909,
+    }
+    d = tmp_path / "humaneval"
+    d.mkdir(parents=True)
+    (d / "qwen3.8-27b_openai_temp_0.0_eval_results.json").write_text(
+        json.dumps(
+            {
+                "eval": {
+                    "HumanEval/0": [{"base_status": "pass", "plus_status": "pass"}],
+                    "HumanEval/1": [{"base_status": "fail", "plus_status": "fail"}],
+                }
+            }
+        )
+    )
+    results, summary = normalize_evalplus(tmp_path, "humaneval", EVALPLUS_031_STDOUT)
+    assert summary["n"] == 2
+    assert [r["correct"] for r in results] == [True, False]
+    assert summary["base_pass_at_1"] == 0.933 and summary["plus_pass_at_1"] == 0.909
+
+
 def test_aider(tmp_path: Path) -> None:
     for lang, ex, outcomes, malformed in (
         ("python", "anagram", [False, True], 1),

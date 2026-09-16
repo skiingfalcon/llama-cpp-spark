@@ -1,6 +1,6 @@
 # qwen3.8-27b
 
-**Status:** measured (Spark CUDA at 131K; RTX 5090 CUDA at 131K and 262K; FinanceBench and coding tier 1 on the RTX 5090). **Careful reader; ties gpt-oss-120b at its native 262K on a 32 GB card in 24 min. Slow only on the Spark. Hidden thinking hurts it on short coding tasks.**
+**Status:** measured (Spark CUDA at 131K; RTX 5090 CUDA at 131K and 262K; FinanceBench and coding tier 1 on the RTX 5090). **Careful reader; matches gpt-oss-120b's 119/121 at its native 262K on a 32 GB card in 24 min. Slow only on the Spark. Hidden thinking hurts it on short coding tasks.**
 
 ## Identity
 
@@ -9,7 +9,7 @@
 | Family / vendor | Alibaba Qwen 3.8 |
 | Architecture | Dense 27B, vision-language checkpoint served text-only; llama.cpp arch `qwen35`; reasoning via hidden thinking |
 | Checkpoint served | `unsloth/Qwen3.8-27B-GGUF`, quant `UD-Q4_K_XL` (17.6 GB) |
-| Native context | 262,144 (served at 131,072 to match the gpt-oss runs) |
+| Native context | 262,144 (served at 131,072 on the Spark to match the gpt-oss runs; 262,144 in RTX 5090 run 2) |
 | License | Apache-2.0 (verify on the model card) |
 | Registry entry | `models.toml` `[models."qwen3.8-27b"]`, port 8084; same entry in `models.halo.toml` for the Windows/RTX 5090 box |
 
@@ -36,11 +36,11 @@ gpt-oss's on the same filings (AAPL 51.4K vs 45.6K tokens; XOM 122K vs 106K).
 | Run | Task | Accuracy | 95% CI | Fits / fallback | Truncated | Decode | Cold prefill | Wall clock | Source |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |
 | **Spark** | extract-full, 10-K | **95.9% (116/121)** | 0.92–0.99 | 93 full, 20 Item-8 section, **8 BM25 chunks** (GS) | 1 | 9.8 t/s | 70–200 s per filing (cold TTFT p50 121 s) | 125 min | `state/evals/sec/qwen3.8-27b-spark-cuda/20260915T024745Z-extract-full` |
-| **RTX 5090, 131K** | extract-full, 10-K | 94.2% (114/121) | 0.90–0.98 | 91 full, 20 Item-8 section, **8 BM25 chunks** (GS, same 3/8 and same wrong values as the Spark) | 1 | 60 t/s | 38–54 s per ~100K filing (cold TTFT p50 30 s) | 22.5 min | `state/evals/sec/qwen3.8-27b-halo-vulkan/20260915T145801Z-extract-full` |
+| **RTX 5090, 131K** | extract-full, 10-K | 94.2% (114/121) | 0.89–0.98 | 91 full, 20 Item-8 section, **8 BM25 chunks** (GS, same 3/8 and same wrong values as the Spark) | 1 | 60 t/s | 38–54 s per ~100K filing (cold TTFT p50 30 s) | 22.5 min | `state/evals/sec/qwen3.8-27b-halo-vulkan/20260915T145801Z-extract-full` |
 | **RTX 5090, 262K + q8_0 KV** | extract-full, 10-K | **98.3% (119/121)** | 0.96–1.00 | 111 full (NEE, STWD now whole), **8 Item-8 section (GS, 131,589 tokens), no chunks** | 0 | 55 t/s | 40–70 s (cold TTFT p50 45 s; STWD 202K whole: 132 s) | 24.3 min | `state/evals/sec/qwen3.8-27b-halo-vulkan/20260915T152312Z-extract-full` |
 | RTX 5090, 131K | qa-financebench, 150 Qs | numeric 60/74 (81%) with unit-tolerant any-number scoring; harness raw 7/74 (scorer defect); 76 free-text unscored (no judge on a 32 GB card) | 0.72–0.89 (numeric, lenient) | evidence excerpts as context | 2 | 75 t/s | n/a (short prompts) | 21 min | `state/evals/sec/qwen3.8-27b-halo-vulkan/20260915T171214Z-qa-financebench` |
-| RTX 5090, **reasoning off** | SWE tier 1 (evalplus, greedy) | HumanEval+ **90.9%** (149/164), MBPP+ **76.5%** (289/378); base 93.3% / 89.2% | 0.86–0.95 / 0.73–0.81 | evalplus default 768-token budget | 0 blank answers | 60 t/s | n/a | ~26 min | `state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T183613Z-tier1` |
-| RTX 5090, reasoning on | SWE tier 1 (evalplus, greedy) | HumanEval+ 86.0% (141/164), MBPP+ 73.8% (279/378); base 86.6% / 85.7% | 0.80–0.91 / 0.69–0.78 | 4096-token budget (`swe.tier1.max_new_tokens`) | **68 blank answers** (budget spent in hidden reasoning) | 60 t/s | n/a | 98 min | `state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T205853Z-tier1` |
+| RTX 5090, **reasoning off** | SWE tier 1 (evalplus, greedy) | HumanEval+ **90.9%** (149/164), MBPP+ **76.5%** (289/378); base 93.3% / 89.2% | 0.86–0.95 / 0.72–0.80 | evalplus default 768-token budget | 0 blank answers | n/a (evalplus records no latency) | n/a | ~26 min (observed, not recorded) | `state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T183613Z-tier1` |
+| RTX 5090, reasoning on | SWE tier 1 (evalplus, greedy) | HumanEval+ 86.0% (141/164), MBPP+ 73.8% (279/378); base 86.6% / 85.7% | 0.80–0.91 / 0.70–0.78 | 4096-token budget (`swe.tier1.max_new_tokens`) | **68 blank answers** (empty content; consistent with the budget spent in hidden reasoning) | n/a (evalplus records no latency) | n/a | 98 min | `state/evals/swe/qwen3.8-27b-halo-vulkan/20260915T205853Z-tier1` |
 
 By mode: full 93/93, section 20/20, chunked 3/8. Reasoning ~230 hidden tokens per question
 (43.6k total, about 2x gpt-oss-120b). Prompt-cache reuse 85%.
@@ -48,7 +48,9 @@ By mode: full 93/93, section 20/20, chunked 3/8. Reasoning ~230 hidden tokens pe
 RTX 5090 extraction, by mode: run 1 full 91/93, section 20/20, chunked 3/8; run 2 full 111/113,
 section 8/8. Hidden reasoning per question is unchanged across machines (p50 224–244 tokens), so
 the 5x wall-clock gap to the Spark is decode and prefill speed, not less thinking. Tier-1
-intervals are per dataset (HumanEval+ / MBPP+). Details: [RTX 5090 extraction
+intervals are per dataset (HumanEval+ / MBPP+); pass counts follow evalplus's printed pass@1
+(plus requires base), so MBPP+ reasoning-off is 289/378 there and 291/378 by the harness's
+plus-only `correct` field. Details: [RTX 5090 extraction
 report](../eval-report-2026-09-rtx5090-cuda-qwen.md), [FinanceBench / tier-1
 report](../eval-report-2026-09-rtx5090-financebench-swe-qwen.md).
 
@@ -68,7 +70,7 @@ report](../eval-report-2026-09-rtx5090-financebench-swe-qwen.md).
 - One truncation at 4096 (GS share count, all budget spent on reasoning).
 - Cold prefill 2.5x slower than gpt-oss-120b (610–740 vs 1,240–1,830 t/s).
 - **Cover-page share count is unstable at temperature 0:** across three extraction runs it missed `CommonStockSharesOutstanding` on GS, XOM, HD and MSFT in different combinations, always as `unknown` or a blown budget, never a wrong number. It is the entire gap between 119/121 and 121/121 at 262K.
-- **Hidden thinking overruns short-answer budgets:** with reasoning on, 68 of 542 tier-1 problems ended at 4,096 tokens with no code emitted, and it scored below its own reasoning-off run on both datasets. The extra thinking bought nothing on function-level coding.
+- **Hidden thinking overruns short-answer budgets:** with reasoning on, 68 of 542 tier-1 problems came back empty (consistent with the 4,096-token budget spent in reasoning), and it scored below its own reasoning-off run on both datasets. Where it did finish, thinking scored 2–5 points higher than the no-think run on the same problems; the blanks (45 of which the no-think run solved) more than erased that.
 - FinanceBench cannot be read yet: the harness's numeric scorer fails correct sentence answers (7/74 raw vs 60/74 lenient) and the free-text half needs the gpt-oss-120b judge, which does not fit beside Qwen on 32 GB.
 
 ## When to use / when not to
@@ -77,11 +79,11 @@ report](../eval-report-2026-09-rtx5090-financebench-swe-qwen.md).
 - **Use** at its native 262K context with `cache_type_k/v = "q8_0"` when GS/STWD-sized documents are common. Measured on the RTX 5090: the chunked misses disappear (GS 8/8) and NEE/STWD read whole.
 - **Do not** use where throughput matters on the Spark; gpt-oss-120b does the same job there in a fifth of the time. On a 5090-class card the throughput objection goes away (24 min for the suite).
 - **Serve it with reasoning off** for chat, coding and other short-answer work (`--reasoning off`); turn thinking on only when the completion budget is well above 4,096 or a `--reasoning-budget` cap is set.
-- **Try** on multi-step reasoning tasks only once the FinanceBench scorer and judge are fixed; tier 1 coding says thinking is a liability at this budget, not an asset.
+- **Try** on multi-step reasoning tasks only once the FinanceBench scorer and judge are fixed; tier 1 coding says thinking is a net liability at a 4,096 budget: modest gains where it finishes, wiped out by blanks.
 
 ## Open questions
 
-- ~~FinanceBench and the coding tier: does the longer reasoning buy anything on tasks that need it?~~ Coding tier 1: no, it costs 68 blank answers at 4,096 (RTX 5090, 2026-09-15). FinanceBench: unanswered until the numeric scorer handles sentence answers and the judge runs; the 76 free-text answers are saved in the run folder.
+- ~~FinanceBench and the coding tier: does the longer reasoning buy anything on tasks that need it?~~ Coding tier 1: +2–5 points where it finishes, minus 68 blank answers at 4,096; net negative (RTX 5090, 2026-09-15). FinanceBench: unanswered until the numeric scorer handles sentence answers and the judge runs; the 76 free-text answers are saved in the run folder.
 - ~~Accuracy at 262K context, and the KV/prefill cost of doing so.~~ 119/121 at 262K with q8_0 KV on the RTX 5090; ~2 GB more VRAM than 131K f16, decode 55 vs 60 t/s, whole-document STWD (202K) prefills cold in 132 s.
 - Same runs on the Spark at 262K (KV memory is not the constraint there) and with reasoning off, for a like-for-like row.
 - Why the cover-page share count comes back `unknown` with the page in context.
