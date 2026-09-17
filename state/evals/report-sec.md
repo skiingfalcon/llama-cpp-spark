@@ -2,13 +2,15 @@
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | openai:gpt-5.6-terra | extract-full | 121 | 0.992 | 0.98–1.00 | 0 | 0 | 1.44 | 1.55 | - | - | 12394653 | 0 | 1260 | 1050000 | openai/api | api | - |
 | gpt-oss-120b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
+| qwen3.8-27b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 1.44 | 6.21 | 1,668 | 55 | 12770130 | 11231740 | 35530 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
 | gpt-oss-120b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 0 | 1.38 | 5.15 | - | 29 | 9976288 | - | - | 131072 | 2.37.0/vulkan:lmstudio-2.37.0 | halo/vulkan | LM Studio stats; prompt t/s not measurable |
 | qwen3.8-27b | extract-full | 121 | 0.959 | 0.92–0.99 | 0 | 1 | 8.6 | 36 | 280 | 9.76 | 10371887 | 8762395 | 43613 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
-| nemotron-3-super | extract-full | 121 | 0.934 | 0.88–0.98 | 0 | 6 | 3.02 | 44 | 700 | 20 | 10544202 | 8837551 | 133636 | 524288 | 82d6bb284d1f/121a-real | spark/cuda | - |
+| nemotron-3-super | extract-full | 121 | 0.926 | 0.87–0.97 | 0 | 6 | 3.15 | 47 | 676 | 19 | 14103962 | 12318170 | 131326 | 1048576 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-20b | extract-full | 121 | 0.876 | 0.81–0.93 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
+| qwen3.8-27b | qa-financebench | 150 | 0.0946 | 0.04–0.16 | 0 | 2 | 0.347 | 4.69 | 2,569 | 76 | 216047 | 8715 | 81450 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 
-> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 9466ddd63b34, 9cc51d84df5a, db2d38b5b7bd, ea71250ebf92)
+> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, ea71250ebf92)
 
 ### Paired (items answered by every run of the task)
 
@@ -16,10 +18,11 @@
 |---|---|---|---|---|---|
 | extract-full | openai:gpt-5.6-terra | 121 | 120 | 0.992 | 0.98–1.00 |
 | extract-full | gpt-oss-120b | 121 | 119 | 0.983 | 0.96–1.00 |
+| extract-full | qwen3.8-27b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | gpt-oss-120b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | qwen3.8-27b | 121 | 116 | 0.959 | 0.92–0.99 |
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |
-| extract-full | nemotron-3-super | 121 | 113 | 0.934 | 0.88–0.98 |
+| extract-full | nemotron-3-super | 121 | 112 | 0.926 | 0.87–0.97 |
 | extract-full | gpt-oss-20b | 121 | 106 | 0.876 | 0.81–0.93 |
 
 ### extract-full: gpt-oss vs Terra
@@ -113,3 +116,10 @@ Rows are (platform/backend); `paired` scores every run on the items all of them 
 | halo/rocm | 0.95 | 0.91–0.98 | 115/121 (0.950) | 0 | 1.19 | 7.43 | 238 | - | 19 | 131072 | - | 2.37.0/rocm:lmstudio-2.37.0 |
 | halo/vulkan | 0.967 | 0.93–0.99 | 117/121 (0.967) | 0 | 1.38 | 5.15 | 300 | - | 29 | 131072 | - | 2.37.0/vulkan:lmstudio-2.37.0 |
 | spark/cuda | 0.983 | 0.96–1.00 | 119/121 (0.983) | 0 | 0.565 | 5.79 | 63 | 250 | 30 | 131072 | NVIDIA GB10 | 82d6bb284d1f/? |
+
+### qwen3.8-27b extract-full
+
+| platform | score | 95% CI | paired | truncated | ttft p50 s | total p50 s | total p95 s | prompt t/s | decode t/s | ctx | gpu | build |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| halo/vulkan | 0.983 | 0.96–1.00 | 119/121 (0.983) | 0 | 1.44 | 6.21 | 43 | 1,668 | 55 | 262144 | AMD Radeon(TM) Graphics | 82d6bb284d1f/? |
+| spark/cuda | 0.959 | 0.92–0.99 | 116/121 (0.959) | 1 | 8.6 | 36 | 196 | 280 | 9.76 | 131072 | NVIDIA GB10 | 82d6bb284d1f/121a-real |

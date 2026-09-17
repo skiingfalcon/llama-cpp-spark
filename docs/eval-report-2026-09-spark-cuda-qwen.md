@@ -3,7 +3,8 @@
 Same 121-question `extract-full` suite as the
 [Spark re-run](eval-report-2026-09-spark-cuda-rerun.md) (gpt-oss-20b / 120b / Terra). This
 report adds **`qwen3.8-27b`** (Unsloth `UD-Q4_K_XL`, dense 27B, llama.cpp arch `qwen35`) on
-the same NVIDIA DGX Spark / CUDA stack and the same 131,072 context.
+the same NVIDIA DGX Spark / CUDA stack and the same 131,072 context. Nemotron-3-Super on this
+suite is in [eval-report-2026-09-spark-cuda-nemotron.md](eval-report-2026-09-spark-cuda-nemotron.md).
 
 | Model | Where it ran | Params (active / total) | Score | Wall clock |
 | --- | --- | --- | ---: | ---: |
