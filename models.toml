@@ -82,3 +82,65 @@ port = 8085
 extra_args = ["--jinja"]
 # NVIDIA's serving defaults (tool-calling profile). Evals pin temperature 0 / seed 42 regardless.
 sampling = { temp = 0.6, top_p = 0.95 }
+
+[models."glm-4.7-flash"]
+# Z.ai GLM-4.7-Flash: MoE, 30B total / ~3.6B active (64 routed experts, 4 per token + 1 shared,
+# 47 layers, MLA attention), native ctx 202752, MIT licence, thinking on by default.
+# Same active size as gpt-oss-20b, so ~45 t/s decode is the expectation on GB10; the question is
+# whether it reads 10-Ks better than 20b did (87.6%). Unsloth UD-Q4_K_XL is 17.5 GB.
+# Default ctx 131072 = the budget every other local model was scored under; the native window
+# (`serve glm-4.7-flash --ctx-size 202752`) still does not fit GS (~270K tokens) whole.
+# Needs llama.cpp >= late Jan 2026 (glm4_moe_lite + the Jan 21 router-scoring fix); the pin qualifies.
+repo = "unsloth/GLM-4.7-Flash-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8086
+extra_args = ["--jinja"]
+# Z.ai's general-use serving profile (tool-calling: temp 0.7 / top_p 1.0). Evals pin temperature 0 / seed 42.
+sampling = { temp = 1.0, top_p = 0.95 }
+
+[models."glm-4.7-flash-nothink"]
+# Same weights with thinking disabled server-side (`--reasoning off` sets enable_thinking=false in
+# the chat template). Same port, so only one of the two runs at a time. For the reasoning-on vs
+# off comparison the RTX 5090 coding runs called for; also the editor/completion profile.
+repo = "unsloth/GLM-4.7-Flash-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8086
+extra_args = ["--jinja", "--reasoning", "off"]
+sampling = { temp = 1.0, top_p = 0.95 }
+
+[models."qwen3.5-122b-a10b"]
+# Alibaba Qwen3.5-122B-A10B: the MoE sibling of qwen3.8-27b. 122B total / ~10B active
+# (256 experts, 8 routed per token + 1 shared), 48 layers of which 12 are full attention and 36 are
+# linear (gated DeltaNet) attention; native ctx 262144; VL checkpoint served text-only like the 27B.
+# Why: dense Qwen read perfectly where it saw the document but decoded at 10 t/s on GB10; ~10B
+# active should land near 20 t/s. This is the like-for-like comparison to gpt-oss-120b.
+#
+# Memory: UD-Q4_K_XL is ~70 GB (split shards; the downloader handles them). Only the 12 attention
+# layers keep KV (2 KV heads x 256 dims): 24 KiB/token at f16 -> 262144 ctx = 6 GiB. Fits the Spark
+# with the whole native window on one slot, but not next to gpt-oss-120b. GS (~273K Qwen tokens)
+# still exceeds 262K and falls to its Item 8 section (131.6K), which scored 8/8 on the RTX 5090.
+repo = "unsloth/Qwen3.5-122B-A10B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 262144
+n_parallel = 1          # keep the whole 262K window on one slot
+port = 8087
+extra_args = ["--jinja"]
+# Qwen's thinking-mode serving profile. Evals pin temperature 0 / seed 42 regardless.
+sampling = { temp = 0.6, top_p = 0.95, top_k = 20, min_p = 0.0 }
+
+[models."qwen3.5-122b-a10b-nothink"]
+# Same weights, thinking disabled server-side (`--reasoning off` = enable_thinking=false). Same port.
+repo = "unsloth/Qwen3.5-122B-A10B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 262144
+n_parallel = 1
+port = 8087
+extra_args = ["--jinja", "--reasoning", "off"]
+# Qwen's non-thinking serving profile.
+sampling = { temp = 0.7, top_p = 0.8, top_k = 20, min_p = 0.0 }

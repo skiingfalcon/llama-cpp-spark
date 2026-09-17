@@ -91,3 +91,49 @@ ctx_size = 131072
 port = 8084
 ubatch_size = 2048
 extra_args = ["--jinja", "--reasoning", "off"]
+
+[models."glm-4.7-flash"]
+# Z.ai GLM-4.7-Flash, MoE 30B / ~3.6B active, 17.5 GB at UD-Q4_K_XL. Same name, quant, port and
+# ctx as models.toml; Halo knobs (--no-mmap, ubatch 512 from defaults) apply. Fits the 32 GB
+# RTX 5090 with room for the 131K KV cache.
+repo = "unsloth/GLM-4.7-Flash-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8086
+extra_args = ["--jinja", "--no-mmap"]
+sampling = { temp = 1.0, top_p = 0.95 }
+
+[models."glm-4.7-flash-nothink"]
+# Same weights, thinking disabled server-side (--reasoning off). Same port as glm-4.7-flash.
+repo = "unsloth/GLM-4.7-Flash-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 131072
+port = 8086
+extra_args = ["--jinja", "--no-mmap", "--reasoning", "off"]
+sampling = { temp = 1.0, top_p = 0.95 }
+
+[models."qwen3.5-122b-a10b"]
+# Qwen3.5-122B-A10B MoE, ~70 GB at UD-Q4_K_XL + ~6 GiB KV at 262K. Fits under the 96 GB Windows
+# graphics-memory cap on the Halo only just; does NOT fit the 32 GB RTX 5090. Same name, quant,
+# port and ctx as models.toml; Halo knobs (--no-mmap, ubatch 512 from defaults) apply.
+repo = "unsloth/Qwen3.5-122B-A10B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 262144
+n_parallel = 1
+port = 8087
+extra_args = ["--jinja", "--no-mmap"]
+sampling = { temp = 0.6, top_p = 0.95, top_k = 20, min_p = 0.0 }
+
+[models."qwen3.5-122b-a10b-nothink"]
+# Same weights, thinking disabled server-side (--reasoning off). Same port.
+repo = "unsloth/Qwen3.5-122B-A10B-GGUF"
+quant = "UD-Q4_K_XL"
+kind = "chat"
+ctx_size = 262144
+n_parallel = 1
+port = 8087
+extra_args = ["--jinja", "--no-mmap", "--reasoning", "off"]
+sampling = { temp = 0.7, top_p = 0.8, top_k = 20, min_p = 0.0 }
