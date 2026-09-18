@@ -1,0 +1,234 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "bonsai-2-27b",
+  "started": "2026-09-18T15:44:48+00:00",
+  "finished": "2026-09-18T16:04:36+00:00",
+  "provenance": {
+    "timestamp": "2026-09-18T15:44:48+00:00",
+    "hostname": "Mike-PC",
+    "machine": "AMD64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": null,
+    "build_id": null,
+    "binary_version": null,
+    "gpu": {
+      "name": "AMD Radeon(TM) Graphics",
+      "driver_version": "32.0.21036.18",
+      "driver_date": "/Date(1762905600000)/",
+      "memory.total": "62885"
+    },
+    "platform": "halo",
+    "backend": "vulkan",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 262144,
+    "total_slots": 4,
+    "model_path": "C:\\Users\\Mike\\AppData\\Local\\local-llm\\models\\Ternary-Bonsai-2-27B-PQ2_0.gguf",
+    "chat_template_sha": "c3cf9e34abf4",
+    "build_info": "b10685-7dffb158d"
+  },
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 8088,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": null,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": "C:\\Users\\Mike\\AppData\\Local\\local-llm\\models\\Ternary-Bonsai-2-27B-PQ2_0.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 4096,
+    "reasoning_effort": null
+  },
+  "task_config": {
+    "scoring_version": "2026-09-13.1",
+    "no_document": false,
+    "max_input_tokens": 0,
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      {
+        "tag": "Revenues",
+        "label": "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "RegulatedAndUnregulatedOperatingRevenue",
+          "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "RevenueFromContractWithCustomerIncludingAssessedTax",
+          "SalesRevenueNet"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "NetIncomeLoss",
+        "label": "net income (loss) attributable to the company",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "ProfitLoss",
+          "NetIncomeLossAvailableToCommonStockholdersBasic"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "OperatingIncomeLoss",
+        "label": "operating income (loss)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "EarningsPerShareDiluted",
+        "label": "diluted earnings per share",
+        "kind": "duration",
+        "unit": "USD/shares",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "NetCashProvidedByUsedInOperatingActivities",
+        "label": "net cash provided by operating activities",
+        "kind": "ytd",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Assets",
+        "label": "total assets",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Liabilities",
+        "label": "total liabilities",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "StockholdersEquity",
+        "label": "total stockholders' equity attributable to the company",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "CashAndCashEquivalentsAtCarryingValue",
+        "label": "cash and cash equivalents",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "LongTermDebtNoncurrent",
+        "label": "long-term debt, excluding the current portion",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "LongTermDebtAndCapitalLeaseObligations"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "CommonStockSharesOutstanding",
+        "label": "common shares outstanding",
+        "kind": "instant",
+        "unit": "shares",
+        "aliases": [
+          "EntityCommonStockSharesOutstanding"
+        ],
+        "accept_aliases": false
+      }
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "d7b23810e084",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "scored": 121,
+    "correct": 117,
+    "score": 0.9669421487603306,
+    "skipped": 0,
+    "errors": 0,
+    "off_by_scale": 0,
+    "truncated": 2,
+    "ttft_p50_s": 1.299232800000027,
+    "ttft_p95_s": 36.510773099999824,
+    "total_p50_s": 3.6662924999995994,
+    "total_p95_s": 46.65354090000028,
+    "prompt_tps_p50": 1787.1016508329576,
+    "decode_tps_p50": 92.92197883068373,
+    "total_tokens": 12777773,
+    "cached_prompt_tokens": 11231740,
+    "reasoning_tokens": 43192,
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 117
+      }
+    },
+    "by_mode": {
+      "full": {
+        "n": 113,
+        "correct": 109
+      },
+      "section": {
+        "n": 8,
+        "correct": 8
+      }
+    },
+    "fallback": 8
+  },
+  "n_results": 121,
+  "format": "runrecord/1",
+  "model_label": "bonsai-2-27b-halo-vulkan"
+}

@@ -137,3 +137,29 @@ n_parallel = 1
 port = 8087
 extra_args = ["--jinja", "--no-mmap", "--reasoning", "off"]
 sampling = { temp = 0.7, top_p = 0.8, top_k = 20, min_p = 0.0 }
+
+[models."bonsai-2-27b"]
+# PrismML Ternary Bonsai 2 27B: Qwen3.8-27B re-expressed in ternary (-1, 0, +1) weights with FP16
+# group scales, 1.72 bits/weight, 7.21 GB as PQ2_0 (2-bit slots; PrismML's faster pack on Blackwell
+# and for prompt processing) vs 17.6 GB for the UD-Q4_K_XL base. Same 262K hybrid-attention backbone,
+# thinks by default (reasoning effort "xhigh" unless told otherwise). Apache-2.0.
+# NEEDS PrismML's llama.cpp fork (github.com/PrismML-Eng/llama.cpp releases): stock llama.cpp rejects
+# the PQ2_0/PTQ1_0 tensor types. Point LOCAL_LLM_LLAMA_BIN_DIR at the fork's binaries for this model.
+# Default ctx 131072 = the budget every other local model was scored under.
+repo = "prism-ml/Ternary-Bonsai-2-27B-gguf"
+file = "Ternary-Bonsai-2-27B-PQ2_0.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8088
+ubatch_size = 2048     # CUDA box; the 512 Halo default is an AMD Vulkan workaround
+extra_args = ["--jinja"]
+
+[models."bonsai-2-27b-nothink"]
+# Same weights, thinking disabled server-side (--reasoning off). Same port.
+repo = "prism-ml/Ternary-Bonsai-2-27B-gguf"
+file = "Ternary-Bonsai-2-27B-PQ2_0.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8088
+ubatch_size = 2048     # CUDA box; the 512 Halo default is an AMD Vulkan workaround
+extra_args = ["--jinja", "--reasoning", "off"]
