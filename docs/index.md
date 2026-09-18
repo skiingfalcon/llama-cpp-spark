@@ -8,6 +8,7 @@
 | You want Nemotron-3-Super on the same suite (131K-budget vs full 1M window) | [eval-report-2026-09-spark-cuda-nemotron.md](eval-report-2026-09-spark-cuda-nemotron.md) | Nemotron add-on (Sept 16–17, 2026) |
 | You want Qwen3.8-27B on a single RTX 5090 (Windows, CUDA): the 131K replication and the native-262K run that recovers Goldman Sachs | [eval-report-2026-09-rtx5090-cuda-qwen.md](eval-report-2026-09-rtx5090-cuda-qwen.md) | Qwen on RTX 5090 (Sept 15, 2026) |
 | You want the first FinanceBench and coding tier-1 (HumanEval/MBPP) runs, Qwen3.8-27B on the RTX 5090, reasoning on vs off, and the harness fixes they needed | [eval-report-2026-09-rtx5090-financebench-swe-qwen.md](eval-report-2026-09-rtx5090-financebench-swe-qwen.md) | first runs of both suites (Sept 15, 2026) |
+| You want PrismML's Ternary Bonsai 2 27B (Qwen3.8-27B at 1.7 bits/weight, 7 GB) against the 4-bit Qwen on the same RTX 5090: extraction at 131K and 262K, FinanceBench, coding tier 1 | [eval-report-2026-09-rtx5090-bonsai2.md](eval-report-2026-09-rtx5090-bonsai2.md) | ternary add-on (Sept 18, 2026) |
 | You want the pre-fix run and the explanation of what the harness fixes changed | [eval-report-2026-09-spark-cuda.md](eval-report-2026-09-spark-cuda.md) | superseded; kept for the cross-check |
 
 Each number has one home: the Halo report owns the AMD columns, the re-run owns the Spark and

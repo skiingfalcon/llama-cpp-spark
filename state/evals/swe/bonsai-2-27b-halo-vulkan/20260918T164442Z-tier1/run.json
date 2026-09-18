@@ -1,0 +1,95 @@
+{
+  "suite": "swe",
+  "task": "tier1",
+  "model": "bonsai-2-27b",
+  "started": "2026-09-18T16:44:42+00:00",
+  "finished": "2026-09-18T17:06:52+00:00",
+  "provenance": {
+    "timestamp": "2026-09-18T16:44:42+00:00",
+    "hostname": "Mike-PC",
+    "machine": "x86_64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": null,
+    "build_id": null,
+    "binary_version": null,
+    "gpu": {},
+    "platform": "halo",
+    "backend": "vulkan",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "total_slots": 4,
+    "model_path": "/home/mike/models/Ternary-Bonsai-2-27B-PQ2_0.gguf",
+    "chat_template_sha": "c3cf9e34abf4",
+    "build_info": "b10685-7dffb158d"
+  },
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 8088,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": null,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": "/home/mike/models/Ternary-Bonsai-2-27B-PQ2_0.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0
+  },
+  "task_config": {
+    "tool": "evalplus",
+    "version": "0.3.1",
+    "datasets": [
+      "humaneval",
+      "mbpp"
+    ],
+    "repo": null,
+    "ref": null,
+    "exercises_repo": null,
+    "exercises_ref": null,
+    "edit_format": null,
+    "dataset": null,
+    "limit": null,
+    "seed": null,
+    "instances": [],
+    "workers": null,
+    "step_limit": null,
+    "max_new_tokens": null
+  },
+  "config_hash": "cf02688db08a",
+  "tools": {
+    "evalplus": "evalplus==0.3.1"
+  },
+  "summary": {
+    "n": 542,
+    "score": 0.7822878228782287,
+    "by_dataset": {
+      "humaneval": {
+        "n": 164,
+        "score": 0.8658536585365854,
+        "base_pass_at_1": 0.915,
+        "plus_pass_at_1": 0.866,
+        "skipped": 0
+      },
+      "mbpp": {
+        "n": 378,
+        "score": 0.746031746031746,
+        "base_pass_at_1": 0.862,
+        "plus_pass_at_1": 0.741,
+        "skipped": 0
+      }
+    },
+    "skipped": 0,
+    "commands": "see run.json tools; logs under work-tier1/"
+  },
+  "n_results": 542,
+  "format": "runrecord/1",
+  "model_label": "bonsai-2-27b-halo-vulkan"
+}

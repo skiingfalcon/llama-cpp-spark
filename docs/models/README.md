@@ -16,6 +16,8 @@ in step.
 | [qwen3.8-27b](qwen3.8-27b.md) | Dense 27B, UD-Q4_K_XL | Spark CUDA | 95.9% | 0.92–0.99 | 9.8 t/s | 125 min | Careful reader, slow; candidate for reasoning tasks |
 | ↳ same, native 262K + q8_0 KV | | RTX 5090 CUDA (Windows) | 98.3% | 0.96–1.00 | 55 t/s | 24 min | Matches 120b's 119/121 on a 32 GB consumer card; GS recovered at 262K |
 | ↳ same, 131K (Spark config) | | RTX 5090 CUDA (Windows) | 94.2% | 0.89–0.98 | 60 t/s | 23 min | Spark result replicated, 5x faster; GS still chunked 3/8 |
+| [bonsai-2-27b](bonsai-2-27b.md) | Dense 27B, ternary 1.72 bpw (PrismML), PQ2_0 7.2 GB | RTX 5090 CUDA (Windows), PrismML fork, 262K f16 KV | 96.7% | 0.93–0.99 | 93 t/s | 20 min | Qwen3.8 at 2.4x less weight memory; 2 Qs behind the Q4 Qwen; more thinking overruns |
+| ↳ same, 131K | | RTX 5090 CUDA (Windows), PrismML fork | 92.6% | 0.88–0.97 | 98 t/s | 21 min | GS chunked 2/8; 5 truncations |
 | [gpt-oss-20b](gpt-oss-20b.md) | MoE 21B / 3.6B active, MXFP4 | Spark CUDA | 87.6% | 0.81–0.93 | 45 t/s | 19 min | Latency/memory option, human review required |
 | [nemotron-3-super](nemotron-3-super.md) | Hybrid Mamba/MoE 120B / 12.7B active, Q4_K | Spark CUDA, capped 131K | 93.4% | 0.88–0.98 | 20 t/s | 148 min | Over-thinks at 4096 (6 truncations); thinking cap + unconstrained run pending |
 | [glm-4.7-flash](glm-4.7-flash.md) | MoE 30B / 3.6B active, UD-Q4_K_XL | planned (Spark first) | — | — | — | — | Small/fast candidate; thinking on vs off runs pending |
