@@ -8,10 +8,11 @@
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
 | glm-4.7-flash | extract-full | 121 | 0.942 | 0.90–0.98 | 0 | 4 | 0.602 | 24 | 146 | 28 | 10900593 | 9713858 | 103079 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | nemotron-3-super | extract-full | 121 | 0.926 | 0.87–0.97 | 0 | 6 | 3.15 | 47 | 676 | 19 | 14103962 | 12318170 | 131326 | 1048576 | 82d6bb284d1f/121a-real | spark/cuda | - |
+| qwen3.5-122b-a10b | extract-full | 121 | 0.909 | 0.85–0.96 | 0 | 10 | 3.87 | 101 | 578 | 17 | 12949305 | 11228093 | 219423 | 262144 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-20b | extract-full | 121 | 0.876 | 0.81–0.93 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
 | qwen3.8-27b | qa-financebench | 150 | 0.0946 | 0.04–0.16 | 0 | 2 | 0.347 | 4.69 | 2,569 | 76 | 216047 | 8715 | 81450 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 
-> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, ea71250ebf92)
+> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, ea71250ebf92)
 
 ### Paired (items answered by every run of the task)
 
@@ -25,6 +26,7 @@
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | glm-4.7-flash | 121 | 114 | 0.942 | 0.90–0.98 |
 | extract-full | nemotron-3-super | 121 | 112 | 0.926 | 0.87–0.97 |
+| extract-full | qwen3.5-122b-a10b | 121 | 110 | 0.909 | 0.85–0.96 |
 | extract-full | gpt-oss-20b | 121 | 106 | 0.876 | 0.81–0.93 |
 
 ### extract-full: gpt-oss vs Terra
