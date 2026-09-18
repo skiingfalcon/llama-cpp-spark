@@ -334,6 +334,32 @@ extra_args = ["--jinja"]
 
 (If a repo publishes multi-part `*-00001-of-00003.gguf` shards, point `file` at the first shard; llama.cpp loads siblings automatically. Download helpers match shard siblings by basename.)
 
+**Model needing a non-default llama.cpp build (e.g. PrismML's ternary Bonsai models):** the
+registry entry looks the same as any other chat model —
+
+```toml
+[models.bonsai-2-27b]
+repo = "prism-ml/Ternary-Bonsai-2-27B-gguf"
+file = "Ternary-Bonsai-2-27B-PQ2_0.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8088
+extra_args = ["--jinja"]
+```
+
+— but the `PQ2_0`/`PTQ1_0` tensor types it ships need PrismML's llama.cpp fork; stock
+llama.cpp rejects them. Build the fork separately from the pinned upstream build (this must
+not replace `vendor/llama.cpp`, which every other Spark model uses):
+
+```bash
+./scripts/build-prismml.sh                    # pin: PRISMML_LLAMA_CPP_VERSION; -> vendor/prismml-llama.cpp/build/bin
+LOCAL_LLM_LLAMA_BIN_DIR=vendor/prismml-llama.cpp/build/bin uv run local-llm serve bonsai-2-27b
+```
+
+`LOCAL_LLM_LLAMA_BIN_DIR` overrides the binary directory on both platforms (see
+`models.halo.toml` for the same knob on Windows/Halo); unset it and `serve` falls back to
+the pinned `vendor/llama.cpp` build for every other model.
+
 Argv is merged in layers: **defaults ← kind flags ← per-model overrides ← CLI flags**.
 
 ### Context window: making the most of it

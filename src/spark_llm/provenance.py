@@ -55,14 +55,23 @@ def pinned_commit() -> str | None:
 
 
 def checkout_commit(settings: Settings) -> str | None:
-    if not (settings.vendor_dir / ".git").exists():
-        return None
-    try:
+    """HEAD of the llama.cpp tree the served binary came from: the LOCAL_LLM_LLAMA_BIN_DIR
+    override (e.g. a fork build) when set, else the pinned vendor checkout."""
+    tree = settings.llama_bin_dir or settings.vendor_dir
+
+    def git(*args: str) -> str:
         return subprocess.check_output(
-            ["git", "-C", str(settings.vendor_dir), "rev-parse", "--short=12", "HEAD"],
-            text=True,
-            timeout=10,
+            ["git", "-C", str(tree), *args], text=True, stderr=subprocess.DEVNULL, timeout=10
         ).strip()
+
+    try:
+        top = Path(git("rev-parse", "--show-toplevel")).resolve()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return None
+    if top == repo_root().resolve():
+        return None  # a bare bin dir inside this project, not a llama.cpp clone
+    try:
+        return git("rev-parse", "--short=12", "HEAD")
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         return None
 

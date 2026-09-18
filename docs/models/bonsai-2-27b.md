@@ -12,7 +12,7 @@
 | Native context | 262,144 |
 | License | Apache-2.0 (verify on the model card) |
 | Registry entry | `models.toml` / `models.halo.toml` `[models."bonsai-2-27b"]` and `bonsai-2-27b-nothink`, port 8088 |
-| Engine | **Requires PrismML's llama.cpp fork** (`github.com/PrismML-Eng/llama.cpp`, custom ternary kernels); stock llama.cpp rejects the `PQ2_0` / `PTQ1_0` tensor types |
+| Engine | **Requires PrismML's llama.cpp fork** (`github.com/PrismML-Eng/llama.cpp`, custom ternary kernels); stock llama.cpp rejects the `PQ2_0` / `PTQ1_0` tensor types. On the Spark, build it with `./scripts/build-prismml.sh` (pin: `PRISMML_LLAMA_CPP_VERSION`, a checkout separate from `vendor/llama.cpp`) and point `LOCAL_LLM_LLAMA_BIN_DIR` at its `build/bin` before serving — no Spark run yet, see Open questions |
 
 ## Serving configuration used
 
@@ -87,7 +87,12 @@ numeric 60/74 lenient. Details and every miss:
   Blackwell; unmeasured here.
 - Reasoning effort `medium` (PrismML's suggestion for shorter answers) vs the `xhigh` default:
   would it remove the overruns without losing the section-mode accuracy?
-- Same runs on the Spark (requires building the fork there), for the platform comparison.
+- Same runs on the Spark: config now exists (`./scripts/build-prismml.sh` +
+  `LOCAL_LLM_LLAMA_BIN_DIR`, registry entries already in `models.toml`), no run yet. GB10's
+  memory bandwidth is the open question — Bonsai's decode gain over 4-bit Qwen on the RTX 5090
+  (93 vs 55 t/s) was smaller than the 2.4x weight reduction, attributed to compute-bound
+  batch-1 decode on Blackwell; whether that holds on the Spark's different SM count and
+  bandwidth is unmeasured.
 - FinanceBench free-text judge pass, as for every other model.
 
 ## Changelog
@@ -95,3 +100,17 @@ numeric 60/74 lenient. Details and every miss:
 - 2026-09-18 — first runs, RTX 5090 (PrismML fork b10685): extraction 131K 112/121 and 262K
   117/121 (GS 8/8), FinanceBench numeric-only, tier 1 reasoning off (reasoning on not run); report
   `docs/eval-report-2026-09-rtx5090-bonsai2.md`; card created.
+- 2026-09-18 — Spark serving path added, no run yet: `SparkPlatform` now honours
+  `LOCAL_LLM_LLAMA_BIN_DIR` (previously Halo-only, so the registry's existing note to set it did
+  nothing on the Spark); added `scripts/build-prismml.sh` and `PRISMML_LLAMA_CPP_VERSION`
+  (pinned `prism-b10685-7dffb15`, matching the RTX 5090 runs) to build the fork into
+  `vendor/prismml-llama.cpp/` without touching the pinned `vendor/llama.cpp` build every other
+  Spark model uses. Provenance follows the override: `llama_cpp_checkout` and `build_id` in
+  `run.json` (and the report's build label) come from the fork tree when it is served;
+  `llama_cpp_pinned` still echoes `LLAMA_CPP_VERSION` (the stock pin), so read `checkout` /
+  `server.build_info`. Verified against PrismML's GitHub: the tag resolves to commit
+  `7dffb158de30…` on their `prism` main line (not the `prism-v6` branch their README says never
+  to build), and the HF repo publishes no mainline-compatible `g64` file for the 27B, so the fork
+  is required. Serve only through `local-llm serve`: it puts the fork's `build/bin` first on
+  `LD_LIBRARY_PATH`; a shell that sourced `scripts/env.sh` has the stock `libggml-*.so` first,
+  which is exactly the library mix PrismML warns against.

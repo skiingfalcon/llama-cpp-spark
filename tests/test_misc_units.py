@@ -4,7 +4,9 @@ platform Protocol conformance."""
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -90,6 +92,40 @@ def test_server_state_roundtrip(tmp_path: Path) -> None:
     save_state(settings, {"a": {"pid": 1, "port": 2, "argv": ["x"], "log": "l"}})
     assert load_state(settings)["a"]["port"] == 2
     assert json.loads((settings.state_dir / "servers.json").read_text())["a"]["pid"] == 1
+
+
+def test_provenance_checkout_follows_bin_dir_override(tmp_path: Path) -> None:
+    fork = tmp_path / "fork"
+    (fork / "build" / "bin").mkdir(parents=True)
+    env = {
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+        "PATH": os.environ["PATH"],
+    }
+    subprocess.run(["git", "init", "-q", str(fork)], check=True, env=env)
+    (fork / "f").write_text("x")
+    subprocess.run(["git", "-C", str(fork), "add", "f"], check=True, env=env)
+    subprocess.run(["git", "-C", str(fork), "commit", "-q", "-m", "m"], check=True, env=env)
+    head = subprocess.check_output(
+        ["git", "-C", str(fork), "rev-parse", "--short=12", "HEAD"], text=True
+    ).strip()
+
+    def settings(bin_dir: Path) -> Settings:
+        return Settings(
+            state_dir=tmp_path / "state",
+            vendor_dir=tmp_path / "vendor",
+            models_dir=tmp_path / "m",
+            llama_bin_dir=bin_dir,
+        )
+
+    # no vendor checkout, but the override points inside a clone: report that clone's HEAD
+    assert provenance.checkout_commit(settings(fork / "build" / "bin")) == head
+    # an override that is just a directory (not a clone) reports nothing rather than this repo
+    bare = tmp_path / "bare-bin"
+    bare.mkdir()
+    assert provenance.checkout_commit(settings(bare)) is None
 
 
 def test_provenance_collect_uses_platform(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

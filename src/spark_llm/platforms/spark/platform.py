@@ -73,15 +73,22 @@ class SparkPlatform:
         return 1800.0
 
     # -- binaries and process control --------------------------------------------------------
+    def bin_dir(self, settings: Settings) -> Path:
+        """The pinned CUDA source build, unless overridden (e.g. a fork with custom kernels
+        that stock llama.cpp rejects, such as PrismML's ternary Bonsai builds)."""
+        if settings.llama_bin_dir is not None:
+            return settings.llama_bin_dir
+        return settings.vendor_dir / "build" / "bin"
+
     def binary_path(self, settings: Settings) -> Path:
-        return settings.vendor_dir / "build" / "bin" / "llama-server"
+        return self.bin_dir(settings) / "llama-server"
 
     def bench_binary(self, settings: Settings) -> Path:
-        return settings.vendor_dir / "build" / "bin" / "llama-bench"
+        return self.bin_dir(settings) / "llama-bench"
 
     def runtime_env(self, settings: Settings) -> dict[str, str]:
         env = os.environ.copy()
-        bin_dir = str(settings.vendor_dir / "build" / "bin")
+        bin_dir = str(self.bin_dir(settings))
         compat = "/usr/local/cuda-13/compat"
         if not Path(compat).is_dir():
             compat = "/usr/local/cuda/compat"
@@ -154,8 +161,9 @@ class SparkPlatform:
 
     # -- build ------------------------------------------------------------------------------
     def build_arch(self, settings: Settings) -> str | None:
-        """CUDA arch recorded by scripts/build.sh; None for builds predating that change."""
-        path = settings.vendor_dir / "build" / ARCH_FILE
+        """CUDA arch recorded next to the served build (scripts/build.sh or build-prismml.sh);
+        None for builds predating that change."""
+        path = self.bin_dir(settings).parent / ARCH_FILE
         return path.read_text().strip() if path.is_file() else None
 
     def build_script(self) -> Path:

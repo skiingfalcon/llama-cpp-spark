@@ -151,7 +151,9 @@ sampling = { temp = 0.7, top_p = 0.8, top_k = 20, min_p = 0.0 }
 # and for prompt processing) vs 17.6 GB for the UD-Q4_K_XL base. Same 262K hybrid-attention backbone,
 # thinks by default (reasoning effort "xhigh" unless told otherwise). Apache-2.0.
 # NEEDS PrismML's llama.cpp fork (github.com/PrismML-Eng/llama.cpp releases): stock llama.cpp rejects
-# the PQ2_0/PTQ1_0 tensor types. Point LOCAL_LLM_LLAMA_BIN_DIR at the fork's binaries for this model.
+# the PQ2_0/PTQ1_0 tensor types. Build it with ./scripts/build-prismml.sh (pin:
+# PRISMML_LLAMA_CPP_VERSION; separate from vendor/llama.cpp) and point LOCAL_LLM_LLAMA_BIN_DIR at
+# its build/bin before serving this model.
 # Default ctx 131072 = the budget every other local model was scored under.
 repo = "prism-ml/Ternary-Bonsai-2-27B-gguf"
 file = "Ternary-Bonsai-2-27B-PQ2_0.gguf"

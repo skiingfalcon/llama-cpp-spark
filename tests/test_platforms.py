@@ -92,6 +92,26 @@ def test_spark_paths_env_and_popen(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert plat.memory_metric == "gpu_mem"
 
 
+def test_spark_bin_dir_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """LOCAL_LLM_LLAMA_BIN_DIR lets a fork (e.g. PrismML's ternary kernels) serve without
+    touching the pinned vendor/llama.cpp build other models rely on."""
+    plat = SparkPlatform()
+    custom = tmp_path / "prismml-fork" / "bin"
+    settings = _settings(tmp_path, llama_bin_dir=custom)
+    assert plat.binary_path(settings) == custom / "llama-server"
+    assert plat.bench_binary(settings) == custom / "llama-bench"
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/x")
+    monkeypatch.setenv("PATH", "/usr/bin")
+    env = plat.runtime_env(settings)
+    compat = (
+        "/usr/local/cuda-13/compat"
+        if Path("/usr/local/cuda-13/compat").is_dir()
+        else "/usr/local/cuda/compat"
+    )
+    assert env["LD_LIBRARY_PATH"] == f"{custom}:{compat}:/x"
+    assert env["PATH"] == f"{custom}:/usr/bin"
+
+
 def test_spark_terminate_and_pid_alive_on_dead_pid() -> None:
     plat = SparkPlatform()
     proc = subprocess.Popen([sys.executable, "-c", "pass"])
@@ -107,6 +127,15 @@ def test_spark_build_arch_reads_arch_file(tmp_path: Path) -> None:
     (tmp_path / "vendor" / "build").mkdir(parents=True)
     (tmp_path / "vendor" / "build" / "spark-arch.txt").write_text("121a-real\n")
     assert SparkPlatform().build_arch(settings) == "121a-real"
+    # with a bin-dir override the arch file next to *that* build wins, not the vendor one
+    fork_bin = tmp_path / "fork" / "build" / "bin"
+    fork_bin.mkdir(parents=True)
+    assert SparkPlatform().build_arch(_settings(tmp_path, llama_bin_dir=fork_bin)) is None
+    (fork_bin.parent / "spark-arch.txt").write_text("121+GGML_NATIVE=OFF\n")
+    assert (
+        SparkPlatform().build_arch(_settings(tmp_path, llama_bin_dir=fork_bin))
+        == "121+GGML_NATIVE=OFF"
+    )
 
 
 # -- halo ------------------------------------------------------------------------------------------
