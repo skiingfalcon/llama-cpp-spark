@@ -3,16 +3,21 @@
 | openai:gpt-5.6-terra | extract-full | 121 | 0.992 | 0.98–1.00 | 0 | 0 | 1.44 | 1.55 | - | - | 12394653 | 0 | 1260 | 1050000 | openai/api | api | - |
 | gpt-oss-120b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
 | qwen3.8-27b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 1.44 | 6.21 | 1,668 | 55 | 12770130 | 11231740 | 35530 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
+| bonsai-2-27b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 2 | 1.3 | 3.67 | 1,787 | 93 | 12777773 | 11231740 | 43192 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
 | gpt-oss-120b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 0 | 1.38 | 5.15 | - | 29 | 9976288 | - | - | 131072 | 2.37.0/vulkan:lmstudio-2.37.0 | halo/vulkan | LM Studio stats; prompt t/s not measurable |
 | qwen3.8-27b | extract-full | 121 | 0.959 | 0.92–0.99 | 0 | 1 | 8.6 | 36 | 280 | 9.76 | 10371887 | 8762395 | 43613 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
 | glm-4.7-flash | extract-full | 121 | 0.942 | 0.90–0.98 | 0 | 4 | 0.602 | 24 | 146 | 28 | 10900593 | 9713858 | 103079 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
+| bonsai-2-27b | extract-full | 121 | 0.934 | 0.88–0.98 | 0 | 4 | 10 | 25 | 244 | 16 | 10383037 | 8762395 | 54794 | 131072 | 7dffb158de30/121a-real | spark/cuda | - |
 | nemotron-3-super | extract-full | 121 | 0.926 | 0.87–0.97 | 0 | 6 | 3.15 | 47 | 676 | 19 | 14103962 | 12318170 | 131326 | 1048576 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | qwen3.5-122b-a10b | extract-full | 121 | 0.909 | 0.85–0.96 | 0 | 10 | 3.87 | 101 | 578 | 17 | 12949305 | 11228093 | 219423 | 262144 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-20b | extract-full | 121 | 0.876 | 0.81–0.93 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
+| bonsai-2-27b | qa-financebench | 150 | 0.108 | 0.04–0.19 | 0 | 5 | 0.319 | 3.11 | 2,962 | 141 | 247610 | 8798 | 113312 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 | qwen3.8-27b | qa-financebench | 150 | 0.0946 | 0.04–0.16 | 0 | 2 | 0.347 | 4.69 | 2,569 | 76 | 216047 | 8715 | 81450 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 
-> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, ea71250ebf92)
+> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 79b275f02365, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, d7b23810e084, ea71250ebf92)
+
+> warning: task qa-financebench: runs use different configs (763cb232e7b3, 87d95c71472e)
 
 ### Paired (items answered by every run of the task)
 
@@ -21,13 +26,17 @@
 | extract-full | openai:gpt-5.6-terra | 121 | 120 | 0.992 | 0.98–1.00 |
 | extract-full | gpt-oss-120b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | qwen3.8-27b | 121 | 119 | 0.983 | 0.96–1.00 |
+| extract-full | bonsai-2-27b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | gpt-oss-120b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | qwen3.8-27b | 121 | 116 | 0.959 | 0.92–0.99 |
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | glm-4.7-flash | 121 | 114 | 0.942 | 0.90–0.98 |
+| extract-full | bonsai-2-27b | 121 | 113 | 0.934 | 0.88–0.98 |
 | extract-full | nemotron-3-super | 121 | 112 | 0.926 | 0.87–0.97 |
 | extract-full | qwen3.5-122b-a10b | 121 | 110 | 0.909 | 0.85–0.96 |
 | extract-full | gpt-oss-20b | 121 | 106 | 0.876 | 0.81–0.93 |
+| qa-financebench | bonsai-2-27b | 74 | 8 | 0.108 | 0.04–0.19 |
+| qa-financebench | qwen3.8-27b | 74 | 7 | 0.0946 | 0.04–0.16 |
 
 ### extract-full: gpt-oss vs Terra
 
@@ -112,6 +121,13 @@ Compared: gpt-oss-120b (`20260912T132250Z-extract-full`), gpt-oss-20b (`20260912
 
 Rows are (platform/backend); `paired` scores every run on the items all of them answered; `95% CI` is a percentile bootstrap over per-item verdicts — overlapping intervals mean the runs are not distinguishable at this sample size. Latency includes each box's own prefill, so the gap is the hardware gap. Prompt t/s is blank for LM Studio-served runs (not measurable from its stats).
 
+
+### bonsai-2-27b extract-full
+
+| platform | score | 95% CI | paired | truncated | ttft p50 s | total p50 s | total p95 s | prompt t/s | decode t/s | ctx | gpu | build |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| halo/vulkan | 0.967 | 0.93–0.99 | 117/121 (0.967) | 2 | 1.3 | 3.67 | 47 | 1,787 | 93 | 262144 | AMD Radeon(TM) Graphics | 82d6bb284d1f/? |
+| spark/cuda | 0.934 | 0.88–0.98 | 113/121 (0.934) | 4 | 10 | 25 | 213 | 244 | 16 | 131072 | NVIDIA GB10 | 7dffb158de30/121a-real |
 
 ### gpt-oss-120b extract-full
 
