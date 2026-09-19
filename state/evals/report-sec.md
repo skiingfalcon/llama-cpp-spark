@@ -1,6 +1,7 @@
 | model | task | n | score | 95% CI | skipped | truncated | ttft p50 s | total p50 s | prompt t/s | decode t/s | tokens | cached | reasoning | ctx | build | platform | note |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | openai:gpt-5.6-terra | extract-full | 121 | 0.992 | 0.98–1.00 | 0 | 0 | 1.44 | 1.55 | - | - | 12394653 | 0 | 1260 | 1050000 | openai/api | api | - |
+| bonsai-2-27b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 1 | 11 | 26 | 229 | 15 | 12775225 | 11231740 | 40621 | 262144 | 7dffb158de30/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
 | qwen3.8-27b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 1.44 | 6.21 | 1,668 | 55 | 12770130 | 11231740 | 35530 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
 | bonsai-2-27b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 2 | 1.3 | 3.67 | 1,787 | 93 | 12777773 | 11231740 | 43192 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
@@ -8,7 +9,6 @@
 | qwen3.8-27b | extract-full | 121 | 0.959 | 0.92–0.99 | 0 | 1 | 8.6 | 36 | 280 | 9.76 | 10371887 | 8762395 | 43613 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
 | glm-4.7-flash | extract-full | 121 | 0.942 | 0.90–0.98 | 0 | 4 | 0.602 | 24 | 146 | 28 | 10900593 | 9713858 | 103079 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
-| bonsai-2-27b | extract-full | 121 | 0.934 | 0.88–0.98 | 0 | 4 | 10 | 25 | 244 | 16 | 10383037 | 8762395 | 54794 | 131072 | 7dffb158de30/121a-real | spark/cuda | - |
 | nemotron-3-super | extract-full | 121 | 0.926 | 0.87–0.97 | 0 | 6 | 3.15 | 47 | 676 | 19 | 14103962 | 12318170 | 131326 | 1048576 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | qwen3.5-122b-a10b | extract-full | 121 | 0.909 | 0.85–0.96 | 0 | 10 | 3.87 | 101 | 578 | 17 | 12949305 | 11228093 | 219423 | 262144 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-20b | extract-full | 121 | 0.876 | 0.81–0.93 | 0 | 1 | 0.39 | 3.59 | 564 | 45 | 10550003 | 9466000 | 28150 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
@@ -24,6 +24,7 @@
 | task | model | paired n | correct | paired score | 95% CI |
 |---|---|---|---|---|---|
 | extract-full | openai:gpt-5.6-terra | 121 | 120 | 0.992 | 0.98–1.00 |
+| extract-full | bonsai-2-27b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | gpt-oss-120b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | qwen3.8-27b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | bonsai-2-27b | 121 | 117 | 0.967 | 0.93–0.99 |
@@ -31,7 +32,6 @@
 | extract-full | qwen3.8-27b | 121 | 116 | 0.959 | 0.92–0.99 |
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | glm-4.7-flash | 121 | 114 | 0.942 | 0.90–0.98 |
-| extract-full | bonsai-2-27b | 121 | 113 | 0.934 | 0.88–0.98 |
 | extract-full | nemotron-3-super | 121 | 112 | 0.926 | 0.87–0.97 |
 | extract-full | qwen3.5-122b-a10b | 121 | 110 | 0.909 | 0.85–0.96 |
 | extract-full | gpt-oss-20b | 121 | 106 | 0.876 | 0.81–0.93 |
@@ -127,7 +127,7 @@ Rows are (platform/backend); `paired` scores every run on the items all of them 
 | platform | score | 95% CI | paired | truncated | ttft p50 s | total p50 s | total p95 s | prompt t/s | decode t/s | ctx | gpu | build |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | halo/vulkan | 0.967 | 0.93–0.99 | 117/121 (0.967) | 2 | 1.3 | 3.67 | 47 | 1,787 | 93 | 262144 | AMD Radeon(TM) Graphics | 82d6bb284d1f/? |
-| spark/cuda | 0.934 | 0.88–0.98 | 113/121 (0.934) | 4 | 10 | 25 | 213 | 244 | 16 | 131072 | NVIDIA GB10 | 7dffb158de30/121a-real |
+| spark/cuda | 0.983 | 0.96–1.00 | 119/121 (0.983) | 1 | 11 | 26 | 209 | 229 | 15 | 262144 | NVIDIA GB10 | 7dffb158de30/121a-real |
 
 ### gpt-oss-120b extract-full
 
