@@ -1,0 +1,239 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "deepseek-v4-flash-nothink",
+  "started": "2026-09-19T12:12:23+00:00",
+  "finished": "2026-09-19T13:03:51+00:00",
+  "provenance": {
+    "timestamp": "2026-09-19T12:12:23+00:00",
+    "hostname": "spark-780e",
+    "machine": "aarch64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": "82d6bb284d1f",
+    "build_id": "121a-real",
+    "binary_version": null,
+    "gpu": {
+      "name": "NVIDIA GB10",
+      "driver_version": "580.173.02",
+      "compute_cap": "12.1",
+      "memory.total": "[N/A]",
+      "memory.used": "[N/A]",
+      "clocks.sm": "2405",
+      "clocks.mem": "[N/A]",
+      "temperature.gpu": "46",
+      "power.draw": "10.92"
+    },
+    "platform": "spark",
+    "backend": "cuda",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "total_slots": 1,
+    "model_path": "/opt/models/unsloth__DeepSeek-V4-Flash-0731-GGUF/UD-Q2_K_XL/DeepSeek-V4-Flash-0731-UD-Q2_K_XL-00001-of-00003.gguf",
+    "chat_template_sha": "e643c31fcec1",
+    "build_info": "b869-82d6bb284"
+  },
+  "runtime": {
+    "host": "0.0.0.0",
+    "port": 8092,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": 1,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": "/opt/models/unsloth__DeepSeek-V4-Flash-0731-GGUF/UD-Q2_K_XL/DeepSeek-V4-Flash-0731-UD-Q2_K_XL-00001-of-00003.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 4096,
+    "reasoning_effort": null
+  },
+  "task_config": {
+    "scoring_version": "2026-09-13.1",
+    "no_document": false,
+    "max_input_tokens": 0,
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      {
+        "tag": "Revenues",
+        "label": "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "RegulatedAndUnregulatedOperatingRevenue",
+          "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "RevenueFromContractWithCustomerIncludingAssessedTax",
+          "SalesRevenueNet"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "NetIncomeLoss",
+        "label": "net income (loss) attributable to the company",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "ProfitLoss",
+          "NetIncomeLossAvailableToCommonStockholdersBasic"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "OperatingIncomeLoss",
+        "label": "operating income (loss)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "EarningsPerShareDiluted",
+        "label": "diluted earnings per share",
+        "kind": "duration",
+        "unit": "USD/shares",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "NetCashProvidedByUsedInOperatingActivities",
+        "label": "net cash provided by operating activities",
+        "kind": "ytd",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Assets",
+        "label": "total assets",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Liabilities",
+        "label": "total liabilities",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "StockholdersEquity",
+        "label": "total stockholders' equity attributable to the company",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "CashAndCashEquivalentsAtCarryingValue",
+        "label": "cash and cash equivalents",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "LongTermDebtNoncurrent",
+        "label": "long-term debt, excluding the current portion",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "LongTermDebtAndCapitalLeaseObligations"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "CommonStockSharesOutstanding",
+        "label": "common shares outstanding",
+        "kind": "instant",
+        "unit": "shares",
+        "aliases": [
+          "EntityCommonStockSharesOutstanding"
+        ],
+        "accept_aliases": false
+      }
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "814702bdea13",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "scored": 121,
+    "correct": 119,
+    "score": 0.9834710743801653,
+    "skipped": 0,
+    "errors": 0,
+    "off_by_scale": 2,
+    "truncated": 0,
+    "ttft_p50_s": 5.7679741099709645,
+    "ttft_p95_s": 190.5244492230122,
+    "total_p50_s": 6.018990473996382,
+    "total_p95_s": 190.94575885799713,
+    "prompt_tps_p50": 366.99203968155825,
+    "decode_tps_p50": 15.999040057596545,
+    "total_tokens": 10577083,
+    "cached_prompt_tokens": 9302499,
+    "reasoning_tokens": 0,
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 119
+      }
+    },
+    "by_mode": {
+      "full": {
+        "n": 104,
+        "correct": 102
+      },
+      "section": {
+        "n": 17,
+        "correct": 17
+      }
+    },
+    "fallback": 17
+  },
+  "n_results": 121,
+  "format": "runrecord/1",
+  "model_label": "deepseek-v4-flash-nothink-spark-cuda"
+}
