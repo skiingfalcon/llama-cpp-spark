@@ -20,8 +20,11 @@ in step.
 | ↳ same, 131K | | RTX 5090 CUDA (Windows), PrismML fork | 92.6% | 0.88–0.97 | 98 t/s | 21 min | GS chunked 2/8; 5 truncations |
 | [gpt-oss-20b](gpt-oss-20b.md) | MoE 21B / 3.6B active, MXFP4 | Spark CUDA | 87.6% | 0.81–0.93 | 45 t/s | 19 min | Latency/memory option, human review required |
 | [nemotron-3-super](nemotron-3-super.md) | Hybrid Mamba/MoE 120B / 12.7B active, Q4_K | Spark CUDA, capped 131K | 93.4% | 0.88–0.98 | 20 t/s | 148 min | Over-thinks at 4096 (6 truncations); thinking cap + unconstrained run pending |
-| [glm-4.7-flash](glm-4.7-flash.md) | MoE 30B / 3.6B active, UD-Q4_K_XL | planned (Spark first) | — | — | — | — | Small/fast candidate; thinking on vs off runs pending |
-| [qwen3.5-122b-a10b](qwen3.5-122b-a10b.md) | MoE 122B / 10B active, UD-Q4_K_XL | planned (Spark, 262K) | — | — | — | — | Like-for-like challenger to 120b; thinking on vs off runs pending |
+| [glm-4.7-flash](glm-4.7-flash.md) | MoE 30B / 3.6B active, UD-Q4_K_XL | Spark CUDA | 94.2% | 0.90–0.98 | 28 t/s | 102 min | Small/fast candidate; 4 truncations; thinking-off run pending |
+| [qwen3.5-122b-a10b](qwen3.5-122b-a10b.md) | MoE 122B / 10B active, UD-Q4_K_XL | Spark CUDA, 262K | 90.9% | 0.85–0.96 | 17 t/s | 250 min | Behind the dense 27B; 10 truncations; thinking-off run pending |
+| [gemma-4-31b](gemma-4-31b.md) | Dense 30.7B, Google QAT q4_0 | planned (Spark first) | — | — | — | — | Google's dense rival to qwen3.8-27b; thinking on vs off runs pending |
+| [gemma-4-26b-a4b](gemma-4-26b-a4b.md) | MoE 25.2B / 3.8B active, Google QAT q4_0 | planned (Spark first) | — | — | — | — | Fast-decode candidate against gpt-oss-20b / GLM; runs pending |
+| [deepseek-v4-flash](deepseek-v4-flash.md) | MoE ~13B active, UD-Q2_K_XL 96.8 GB, 1M ctx | planned (Spark only; nothink row primary) | — | — | — | — | Only DeepSeek V4 that fits 128 GB; 2-bit quality and prompt-cache gate pending |
 | [gpt-5.6-terra](gpt-5.6-terra.md) | Hosted frontier | OpenAI API | 99.2% | 0.98–1.00 | — | 20 min, ~$25 | Ceiling reference |
 
 Intervals are percentile bootstraps over per-item verdicts from a single run; overlapping

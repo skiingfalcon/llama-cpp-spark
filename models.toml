@@ -170,3 +170,97 @@ kind = "chat"
 ctx_size = 131072
 port = 8088
 extra_args = ["--jinja", "--reasoning", "off"]
+
+[models."gemma-4-31b"]
+# Google Gemma 4 31B-it: dense 30.7B, Google's own QAT q4_0 GGUF (17.65 GB; the 1.2 GB mmproj is
+# not loaded, text only). Apache-2.0. Native 256K ctx; 60 layers, 1024-token sliding window
+# interleaved 5:1 with global layers (32 heads / 16 KV heads, head_dim 256; global layers share K/V),
+# so KV is small; read "KV self size" in state/gemma-4-31b.log. SWA models re-prefill about one
+# ubatch per warm request through context checkpoints, as qwen3.8-27b did.
+# Thinking via enable_thinking (`--reasoning off` disables it); the pin has the gemma4 parser
+# (arch gemma4, upstream since April 2026).
+# Why: the like-for-like rival to qwen3.8-27b (dense ~30B, same 4-bit class) with a 262,144-token
+# vocabulary, so filings cost fewer tokens and more of them should fit 131K whole.
+# Default ctx 131072 = the shared budget; `serve gemma-4-31b --ctx-size 262144` for the native window.
+repo = "google/gemma-4-31B-it-qat-q4_0-gguf"
+file = "gemma-4-31B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8089
+extra_args = ["--jinja"]
+# Google's serving profile. Evals pin temperature 0 / seed 42 regardless.
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."gemma-4-31b-nothink"]
+# Same weights, thinking disabled server-side (`--reasoning off` = enable_thinking=false). Same port.
+repo = "google/gemma-4-31B-it-qat-q4_0-gguf"
+file = "gemma-4-31B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8089
+extra_args = ["--jinja", "--reasoning", "off"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."gemma-4-26b-a4b"]
+# Gemma 4 26B-A4B-it: MoE 25.2B total / 3.8B active, 30 layers, 128 experts, same 5:1 SWA layout
+# and 262,144 vocab as the 31B. Google QAT q4_0, 14.44 GB. Same active size as gpt-oss-20b and
+# glm-4.7-flash, so ~40 t/s decode is the expectation on GB10; the question is whether it reads
+# 10-Ks better than they did (87.6% / 94.2%).
+repo = "google/gemma-4-26B-A4B-it-qat-q4_0-gguf"
+file = "gemma-4-26B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8091
+extra_args = ["--jinja"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."gemma-4-26b-a4b-nothink"]
+# Same weights, thinking disabled server-side (--reasoning off). Same port.
+repo = "google/gemma-4-26B-A4B-it-qat-q4_0-gguf"
+file = "gemma-4-26B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8091
+extra_args = ["--jinja", "--reasoning", "off"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."deepseek-v4-flash"]
+# DeepSeek-V4-Flash-0731 (MIT): MoE, 43 layers, 256 routed + 1 shared experts, 6 active/token,
+# ~13B active; per-layer compressed sparse attention (compress_ratios 4x/128x, head_dim 512,
+# sliding_window 128, lightning indexer index_topk 512); native 1,048,576 ctx (YaRN x16 from 64K);
+# vocab 129,280; llama.cpp arch deepseek4 (June 2026) + the 0731 chat template (Aug 2026), both in
+# the pin. Unsloth UD-Q2_K_XL, 3 shards in the UD-Q2_K_XL/ subfolder, 96.8 GB (the downloader
+# handles them, as for qwen3.5-122b-a10b). UD-IQ3_XXS (104.2 GB) is the upgrade if memory allows;
+# UD-Q4_K_XL (155 GB) does not fit. V4.1-Flash (552B) and V4-Pro do not fit at any quant.
+# KV: the vendor quotes ~3.5 KB/token for V4-Flash in its own engine; read llama.cpp's "KV self
+# size" from state/deepseek-v4-flash.log before raising ctx. 131072 first; the 1M window is not
+# attempted next to 97 GB of weights on 128 GB. KV types left at f16 (the pin forces matching K/V
+# types and FA when V is quantised, PR #25871). Spark only: over the Halo's 96 GB VGM cap and the
+# 5090. Drop the page cache before the first load (see nemotron) and serve with
+# LOCAL_LLM_HEALTH_TIMEOUT_S=1500 (the 300 s default is too short for a 97 GB load).
+# PIN RISKS, gated by scripts/spark-new-models-smoke.sh before any full run: DeepSeek ships no
+# Jinja template (verify the served template and reasoning_content separation) and the prompt
+# cache delimiters fix (upstream PR #29008) landed after our pin: cached_prompt_tokens on warm
+# rows must be >= 80% of the prompt or every question re-prefills the filing.
+repo = "unsloth/DeepSeek-V4-Flash-0731-GGUF"
+quant = "UD-Q2_K_XL"
+kind = "chat"
+ctx_size = 131072
+n_parallel = 1          # one slot; the window is the point of this model
+port = 8092
+extra_args = ["--jinja"]
+# No sampling line: the vendor profile (temp 1.0, top_p 0.95 agentic / 1.0 otherwise) is for
+# thinking mode; model defaults apply. Evals pin temperature 0 / seed 42 regardless.
+
+[models."deepseek-v4-flash-nothink"]
+# PRIMARY row for our 4096-token completion budget: the vendor sizes thinking output at up to 384K
+# tokens, so thinking on will truncate. Same port. The pinned V4 Flash 0731 template honours
+# enable_thinking, so `--reasoning off` is enough; if the served GGUF template differs, use
+# ["--jinja", "--chat-template-kwargs", "{\"enable_thinking\": false}"] instead.
+repo = "unsloth/DeepSeek-V4-Flash-0731-GGUF"
+quant = "UD-Q2_K_XL"
+kind = "chat"
+ctx_size = 131072
+n_parallel = 1
+port = 8092
+extra_args = ["--jinja", "--reasoning", "off"]

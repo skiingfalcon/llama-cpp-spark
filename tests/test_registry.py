@@ -64,6 +64,10 @@ def test_halo_registry_mirrors_model_names_and_ports() -> None:
         "qwen3-8b",
         "qwen3-embedding-4b",
         "nemotron-3-super",
+        "gemma-4-31b",
+        "gemma-4-31b-nothink",
+        "gemma-4-26b-a4b",
+        "gemma-4-26b-a4b-nothink",
     ):
         assert name in halo.models, name
         assert halo.models[name].port == spark.models[name].port
@@ -81,3 +85,57 @@ def test_nemotron_entry_keeps_the_whole_window_on_one_slot() -> None:
     assert spec.repo == "ggml-org/nemotron-3-super-120b-GGUF"
     assert spec.ctx_size == 524288 and spec.n_parallel == 1 and spec.port == 8085
     assert spec.sampling is not None and spec.sampling.temp == 0.6
+
+
+def _both_registries():
+    from spark_llm.config import Settings, repo_root
+
+    return {
+        "spark": load_registry(),
+        "halo": load_registry(settings=Settings(models_toml=repo_root() / "models.halo.toml")),
+    }
+
+
+def test_shared_ports_serve_the_same_weights() -> None:
+    """Two entries may share a port only when they are twins of the same weights (they cannot
+    run at the same time); anything else is a collision."""
+    for label, reg in _both_registries().items():
+        by_port: dict[int, set[tuple[str | None, str | None, str | None]]] = {}
+        for spec in reg.models.values():
+            if spec.port is None:
+                continue
+            by_port.setdefault(spec.port, set()).add((spec.repo, spec.file, spec.quant))
+        clashes = {port: srcs for port, srcs in by_port.items() if len(srcs) > 1}
+        assert not clashes, f"{label}: different weights on one port: {clashes}"
+
+
+def test_nothink_twins_match_their_base() -> None:
+    for label, reg in _both_registries().items():
+        for name, twin in reg.models.items():
+            if not name.endswith("-nothink"):
+                continue
+            base = reg.models.get(name.removesuffix("-nothink"))
+            assert base is not None, f"{label}: {name} has no base entry"
+            for field in ("port", "repo", "file", "quant", "ctx_size", "n_parallel"):
+                assert getattr(twin, field) == getattr(base, field), f"{label}: {name}.{field}"
+            args = twin.extra_args
+            assert "--reasoning" in args and args[args.index("--reasoning") + 1] == "off", name
+
+
+def test_gemma4_entries() -> None:
+    reg = load_registry()
+    dense, moe = reg.get("gemma-4-31b"), reg.get("gemma-4-26b-a4b")
+    assert dense.repo == "google/gemma-4-31B-it-qat-q4_0-gguf" and dense.port == 8089
+    assert moe.repo == "google/gemma-4-26B-A4B-it-qat-q4_0-gguf" and moe.port == 8091
+    for spec in (dense, moe):
+        assert (spec.file or "").endswith(".gguf") and spec.ctx_size == 131072
+        assert spec.sampling is not None and spec.sampling.top_k == 64
+
+
+def test_deepseek_entry_is_spark_only() -> None:
+    regs = _both_registries()
+    spec = regs["spark"].get("deepseek-v4-flash")
+    assert spec.repo == "unsloth/DeepSeek-V4-Flash-0731-GGUF" and spec.quant == "UD-Q2_K_XL"
+    assert spec.ctx_size == 131072 and spec.n_parallel == 1 and spec.port == 8092
+    assert "deepseek-v4-flash" not in regs["halo"].models  # over the Halo's 96 GB VGM cap
+    assert not any(s.port == 8092 for s in regs["halo"].models.values())  # port stays reserved

@@ -163,3 +163,50 @@ ctx_size = 131072
 port = 8088
 ubatch_size = 2048     # CUDA box; the 512 Halo default is an AMD Vulkan workaround
 extra_args = ["--jinja", "--reasoning", "off"]
+
+[models."gemma-4-31b"]
+# Google Gemma 4 31B-it, dense 30.7B, Google's QAT q4_0 GGUF (17.65 GB). Same name, file, port and
+# ctx as models.toml; Halo knobs (--no-mmap, ubatch 512 from defaults) apply. Fits the 32 GB RTX
+# 5090 with room for the 131K KV cache (SWA layers keep only a 1024-token window).
+repo = "google/gemma-4-31B-it-qat-q4_0-gguf"
+file = "gemma-4-31B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8089
+extra_args = ["--jinja", "--no-mmap"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."gemma-4-31b-nothink"]
+# Same weights, thinking disabled server-side (--reasoning off). Same port.
+repo = "google/gemma-4-31B-it-qat-q4_0-gguf"
+file = "gemma-4-31B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8089
+extra_args = ["--jinja", "--no-mmap", "--reasoning", "off"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."gemma-4-26b-a4b"]
+# Gemma 4 26B-A4B-it, MoE 25.2B / 3.8B active, Google QAT q4_0 (14.44 GB). Same name, file, port
+# and ctx as models.toml; Halo knobs apply. Fits the RTX 5090.
+repo = "google/gemma-4-26B-A4B-it-qat-q4_0-gguf"
+file = "gemma-4-26B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8091
+extra_args = ["--jinja", "--no-mmap"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+[models."gemma-4-26b-a4b-nothink"]
+# Same weights, thinking disabled server-side (--reasoning off). Same port.
+repo = "google/gemma-4-26B-A4B-it-qat-q4_0-gguf"
+file = "gemma-4-26B_q4_0-it.gguf"
+kind = "chat"
+ctx_size = 131072
+port = 8091
+extra_args = ["--jinja", "--no-mmap", "--reasoning", "off"]
+sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
+
+# deepseek-v4-flash (models.toml, port 8092) is Spark-only: its 96.8 GB of UD-Q2_K_XL weights alone
+# exceed the 96 GB Windows graphics-memory cap on the Halo and the 32 GB RTX 5090. Port 8092 is
+# reserved so the names stay aligned if a Linux-on-Halo path ever serves it.
