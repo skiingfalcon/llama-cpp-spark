@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Register-and-measure pass for newly added models on the DGX Spark: Gemma 4 31B, Gemma 4 26B-A4B,
-# DeepSeek V4 Flash (models.toml). Runs on the Spark; everything it learns lands under state/evals/
-# (the only committed part of state/) so the numbers can be read back on a machine without a GPU.
+# DeepSeek V4 Flash, Laguna S 2.1 (models.toml). Runs on the Spark; everything it learns lands under
+# state/evals/ (the only committed part of state/) so the numbers can be read back on a machine
+# without a GPU.
 #
 #   FULL=1 PUSH=1 ./scripts/spark-new-models-smoke.sh
 #
-# Per model and its -nothink twin: download, serve, record /props + server-log excerpt + GPU memory,
-# a chat smoke (raw JSON keeps reasoning_content visible), `eval swe check` on the twin, a 22-item
-# extract-full gate run, then a gate check (no errors, answers present, warm-row prompt-cache ratio
-# >= 0.8, reasoning present/absent as the twin implies). Models that pass get the full 121-question
-# run when FULL=1. Re-runnable: steps whose output exists are skipped; RESUME=<stamp> reuses a dir.
+# Per model and its thinking-toggle twin: download, serve, record /props + server-log excerpt + GPU
+# memory, a chat smoke (raw JSON keeps reasoning_content visible), `eval swe check` on the twin, a
+# 22-item extract-full gate run, then a gate check (no errors, answers present, warm-row prompt-cache
+# ratio >= 0.8, reasoning present/absent as the twin implies). Models that pass get the full
+# 121-question run when FULL=1. Re-runnable: steps whose output exists are skipped; RESUME=<stamp>
+# reuses a dir.
+#
+# Twin naming: every model here defaults to thinking ON and has a "-nothink" twin that turns it off,
+# except Laguna, whose vendor default is thinking OFF, so its twin is "-thinking" (turns it on) and
+# the bare name is already the primary, thinking-off row.
 #
 # Env: MODELS (default below) FULL=1 PUSH=1 DRY_RUN=1 RESUME=<stamp> MIN_FREE_GB (default 135)
 set -euo pipefail
@@ -18,11 +24,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
-MODELS="${MODELS:-gemma-4-26b-a4b gemma-4-31b deepseek-v4-flash}"
+MODELS="${MODELS:-gemma-4-26b-a4b gemma-4-31b deepseek-v4-flash laguna-s-2.1}"
 FULL="${FULL:-0}"
 PUSH="${PUSH:-0}"
 DRY_RUN="${DRY_RUN:-0}"
-MIN_FREE_GB="${MIN_FREE_GB:-135}"
+MIN_FREE_GB="${MIN_FREE_GB:-175}"
 MODELS_DIR="${LOCAL_LLM_MODELS_DIR:-/opt/models}"
 export LOCAL_LLM_HEALTH_TIMEOUT_S="${LOCAL_LLM_HEALTH_TIMEOUT_S:-1500}"   # a 97 GB load beats the 300 s default
 
@@ -64,7 +70,9 @@ rows = [json.loads(l) for l in open(f"{run}/results.jsonl")]
 warm = [r for r in rows if r.get("warm") and r.get("prompt_tokens") and not r.get("skipped")]
 ratios = [(r.get("cached_prompt_tokens") or 0) / r["prompt_tokens"] for r in warm]
 gaps = [r["prompt_tokens"] - (r.get("cached_prompt_tokens") or 0) for r in warm]
-nothink = model.endswith("-nothink")
+thinking_off_expected = model.endswith("-nothink") or (
+    model.startswith("laguna-") and not model.endswith("-thinking")
+)  # Laguna defaults to thinking off; its twin ("-thinking") turns it on
 reasoning = [r.get("reasoning_tokens") or 0 for r in rows if not r.get("skipped")]
 checks = {
     "finished": bool(rj.get("finished")),
@@ -73,7 +81,7 @@ checks = {
     "answers_present": all((r.get("answer") or "").strip() for r in rows if not r.get("skipped")),
     "no_think_tags_in_answers": all("<think>" not in (r.get("answer") or "") for r in rows),
     "warm_cache_ratio_ok": bool(ratios) and statistics.median(ratios) >= 0.8,
-    "reasoning_as_expected": (max(reasoning, default=0) == 0) if nothink else (max(reasoning, default=0) > 0),
+    "reasoning_as_expected": (max(reasoning, default=0) == 0) if thinking_off_expected else (max(reasoning, default=0) > 0),
 }
 report = {
     "model": model, "run": run, "n": len(rows), "checks": checks, "passed": all(checks.values()),
@@ -106,9 +114,10 @@ stop_all
 
 if [[ "${DRY_RUN}" != "1" ]]; then
   free_gb="$(df -BG --output=avail "${MODELS_DIR}" | tail -1 | tr -dc '0-9')"
-  if [[ " ${MODELS} " == *" deepseek-v4-flash "* && "${free_gb}" -lt "${MIN_FREE_GB}" ]]; then
-    echo "error: ${free_gb} GB free under ${MODELS_DIR}; need ${MIN_FREE_GB} GB for the three downloads" \
-         "(17.65 + 14.44 + 96.8 GB). Free space or run with MODELS='gemma-4-26b-a4b gemma-4-31b'." >&2
+  if [[ " ${MODELS} " == *" deepseek-v4-flash "* || " ${MODELS} " == *" laguna-s-2.1 "* ]] \
+     && [[ "${free_gb}" -lt "${MIN_FREE_GB}" ]]; then
+    echo "error: ${free_gb} GB free under ${MODELS_DIR}; need ${MIN_FREE_GB} GB for the four downloads" \
+         "(17.65 + 14.44 + 96.8 + ~40 GB). Free space or run with MODELS='gemma-4-26b-a4b gemma-4-31b'." >&2
     exit 1
   fi
 fi
@@ -116,6 +125,7 @@ fi
 # 1. Per model: download, then for base and twin: serve, smoke, gate
 for M in ${MODELS}; do
   T="${M}-nothink"
+  [[ "${M}" == laguna-* ]] && T="${M}-thinking"   # Laguna defaults to thinking off; its twin turns it on
   run "download.${M}" "${SMOKE}/${M}/download.txt" bash -c "mkdir -p '${SMOKE}/${M}'; uv run local-llm download '${M}' 2>&1 | tee '${SMOKE}/${M}/download.txt'"
 
   order=("${M}" "${T}")

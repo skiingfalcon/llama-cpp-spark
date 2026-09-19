@@ -25,6 +25,7 @@ in step.
 | [gemma-4-31b](gemma-4-31b.md) | Dense 30.7B, Google QAT q4_0 | planned (Spark first) | — | — | — | — | Google's dense rival to qwen3.8-27b; thinking on vs off runs pending |
 | [gemma-4-26b-a4b](gemma-4-26b-a4b.md) | MoE 25.2B / 3.8B active, Google QAT q4_0 | planned (Spark first) | — | — | — | — | Fast-decode candidate against gpt-oss-20b / GLM; runs pending |
 | [deepseek-v4-flash](deepseek-v4-flash.md) | MoE ~13B active, UD-Q2_K_XL 96.8 GB, 1M ctx | planned (Spark only; nothink row primary) | — | — | — | — | Only DeepSeek V4 that fits 128 GB; 2-bit quality and prompt-cache gate pending |
+| [laguna-s-2.1](laguna-s-2.1.md) | MoE 118B / 8B active, UD-Q4_K_XL 40 GB | planned (Spark + Halo) | — | — | — | — | First coding-specialist model on the roster; apples-to-apples MoE peer to gpt-oss-120b; thinking-on twin (`-thinking`) since vendor default is off |
 | [gpt-5.6-terra](gpt-5.6-terra.md) | Hosted frontier | OpenAI API | 99.2% | 0.98–1.00 | — | 20 min, ~$25 | Ceiling reference |
 
 Intervals are percentile bootstraps over per-item verdicts from a single run; overlapping

@@ -68,6 +68,8 @@ def test_halo_registry_mirrors_model_names_and_ports() -> None:
         "gemma-4-31b-nothink",
         "gemma-4-26b-a4b",
         "gemma-4-26b-a4b-nothink",
+        "laguna-s-2.1",
+        "laguna-s-2.1-thinking",
     ):
         assert name in halo.models, name
         assert halo.models[name].port == spark.models[name].port
@@ -139,3 +141,17 @@ def test_deepseek_entry_is_spark_only() -> None:
     assert spec.ctx_size == 131072 and spec.n_parallel == 1 and spec.port == 8092
     assert "deepseek-v4-flash" not in regs["halo"].models  # over the Halo's 96 GB VGM cap
     assert not any(s.port == 8092 for s in regs["halo"].models.values())  # port stays reserved
+
+
+def test_laguna_entry() -> None:
+    """Laguna's vendor default is thinking off, so the base entry is the primary row and the
+    twin is named "-thinking" (turns thinking on), inverting every other model's "-nothink"
+    convention. It also fits both platforms, unlike deepseek-v4-flash."""
+    for label, reg in _both_registries().items():
+        base, thinking = reg.get("laguna-s-2.1"), reg.get("laguna-s-2.1-thinking")
+        assert base.repo == "unsloth/Laguna-S-2.1-GGUF" and base.quant == "UD-Q4_K_XL"
+        assert base.ctx_size == 131072 and base.port == 8093 == thinking.port
+        assert "--reasoning" not in base.extra_args, label
+        args = thinking.extra_args
+        assert "--chat-template-kwargs" in args, label
+        assert args[args.index("--chat-template-kwargs") + 1] == '{"enable_thinking": true}', label
