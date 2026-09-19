@@ -11,8 +11,9 @@ or similar, after a run has landed under `state/evals/` and (ideally) has a repo
 ## Procedure
 
 1. **Locate the evidence.** The run directories under `state/evals/<suite>/<model>-<platform>-<backend>/`,
-   the report in `docs/eval-report-*.md`, the card in `docs/models/<model>.md`, and the
-   machine table `state/evals/report-sec.md`. Pull master first if the run came from another box.
+   the report in `docs/eval-report-*.md`, the card in `docs/models/<model>.md`, the
+   machine table `state/evals/report-sec.md`, and the canonical comparison table
+   `docs/eval-comparison-table.md`. Pull master first if the run came from another box.
 2. **Get the numbers from the artifacts, not from memory.** From the repo root:
 
    ```bash
@@ -34,9 +35,14 @@ or similar, after a run has landed under `state/evals/` and (ideally) has a repo
 4. **Write the email** in the structure below, then save it to
    `docs/emails/YYYY-MM-DD-<model>.md` with a `## Fact trail` table (claim → run dir, report
    section, or URL) under a horizontal rule. Show the user the email body in chat.
-5. **Fact-check pass before showing it:** every number in the prose appears in the facts output
+5. **Update `docs/eval-comparison-table.md` in the same turn.** Add the new row(s) in the right
+   sorted position, and add a line to its "Row provenance" table pointing at this run directory
+   and email. This file, not any past email, is what the next model-run-email draft reads. Do
+   this even if the user did not explicitly ask for the table update.
+6. **Fact-check pass before showing it:** every number in the prose appears in the facts output
    or the report; intervals are quoted when a gap is called real or noise; single run per row is
-   stated; anything not yet run (memorisation control, judge pass) is named as outstanding.
+   stated; anything not yet run (memorisation control, judge pass) is named as outstanding; the
+   table row count in the email matches `docs/eval-comparison-table.md` exactly.
 
 ## Structure (match the earlier emails)
 
@@ -52,9 +58,14 @@ or similar, after a run has landed under `state/evals/` and (ideally) has a repo
   length), and what the misses actually were.
 - **Recommendation**: does the on-prem default change; when this model is the right pick; the one
   or two experiments that would change the answer, stated as runs with expected outcomes.
-- The comparison table with the standard columns: Stack | Accuracy, 121 Qs | When the filing
-  fits, of 104 Qs | Decode | Cold prefill, new ~100K filing | Full run | Cost per run. Keep all
-  prior rows, add the new ones in bold, sort by accuracy. Explain the "fits" column in one line.
+- **The comparison table is mandatory in every email, no exceptions.** Read it from
+  `docs/eval-comparison-table.md`, never from the last email you happen to find under
+  `docs/emails/` — not every drafted email gets committed there (the Bonsai rows landed
+  2026-09-18 with no committed email, and a draft that skipped the canonical file missed them).
+  Standard columns: Stack | Accuracy, 121 Qs | When the filing fits, of 104 Qs | Decode | Cold
+  prefill, new ~100K filing | Full run | Cost per run. Keep every existing row, add the new one(s)
+  in bold, sort by accuracy (ties keep the existing relative order, new row goes last within its
+  tier). Explain the "fits" column in one line.
 - Housekeeping notes (two at most) and the outstanding pre-publication items.
 - **Write-ups**: report, model card, `docs/index.md`, `state/evals/report-sec.md`, as full
   GitHub URLs on `master`.
