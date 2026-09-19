@@ -6,6 +6,7 @@
 | gpt-oss-120b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 0.565 | 5.79 | 250 | 30 | 10542592 | 9466001 | 20720 | 131072 | 82d6bb284d1f/? | spark/cuda | - |
 | qwen3.8-27b | extract-full | 121 | 0.983 | 0.96–1.00 | 0 | 0 | 1.44 | 6.21 | 1,668 | 55 | 12770130 | 11231740 | 35530 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
 | bonsai-2-27b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 2 | 1.3 | 3.67 | 1,787 | 93 | 12777773 | 11231740 | 43192 | 262144 | 82d6bb284d1f/? | halo/vulkan | - |
+| gemma-4-31b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 0 | 1.41 | 31 | 101 | 7.88 | 10295657 | 8902194 | 32696 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 0 | 1.38 | 5.15 | - | 29 | 9976288 | - | - | 131072 | 2.37.0/vulkan:lmstudio-2.37.0 | halo/vulkan | LM Studio stats; prompt t/s not measurable |
 | qwen3.8-27b | extract-full | 121 | 0.959 | 0.92–0.99 | 0 | 1 | 8.6 | 36 | 280 | 9.76 | 10371887 | 8762395 | 43613 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
@@ -16,7 +17,7 @@
 | bonsai-2-27b | qa-financebench | 150 | 0.108 | 0.04–0.19 | 0 | 5 | 0.319 | 3.11 | 2,962 | 141 | 247610 | 8798 | 113312 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 | qwen3.8-27b | qa-financebench | 150 | 0.0946 | 0.04–0.16 | 0 | 2 | 0.347 | 4.69 | 2,569 | 76 | 216047 | 8715 | 81450 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 
-> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 79b275f02365, 814702bdea13, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, d7b23810e084, ea71250ebf92)
+> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 79b275f02365, 814702bdea13, 88ae57b21e01, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, d7b23810e084, ea71250ebf92)
 
 > warning: task qa-financebench: runs use different configs (763cb232e7b3, 87d95c71472e)
 
@@ -30,6 +31,7 @@
 | extract-full | gpt-oss-120b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | qwen3.8-27b | 121 | 119 | 0.983 | 0.96–1.00 |
 | extract-full | bonsai-2-27b | 121 | 117 | 0.967 | 0.93–0.99 |
+| extract-full | gemma-4-31b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | gpt-oss-120b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | qwen3.8-27b | 121 | 116 | 0.959 | 0.92–0.99 |
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |

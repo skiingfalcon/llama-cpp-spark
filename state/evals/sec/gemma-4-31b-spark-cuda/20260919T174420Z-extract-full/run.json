@@ -1,0 +1,243 @@
+{
+  "suite": "sec",
+  "task": "extract-full",
+  "model": "gemma-4-31b",
+  "started": "2026-09-19T17:44:20+00:00",
+  "finished": "2026-09-19T19:54:12+00:00",
+  "provenance": {
+    "timestamp": "2026-09-19T17:44:20+00:00",
+    "hostname": "spark-780e",
+    "machine": "aarch64",
+    "tool_version": "0.1.0",
+    "llama_cpp_pinned": "82d6bb284d1f",
+    "llama_cpp_checkout": "82d6bb284d1f",
+    "build_id": "121a-real",
+    "binary_version": null,
+    "gpu": {
+      "name": "NVIDIA GB10",
+      "driver_version": "580.173.02",
+      "compute_cap": "12.1",
+      "memory.total": "[N/A]",
+      "memory.used": "[N/A]",
+      "clocks.sm": "2411",
+      "clocks.mem": "[N/A]",
+      "temperature.gpu": "46",
+      "power.draw": "10.88"
+    },
+    "platform": "spark",
+    "backend": "cuda",
+    "llama_cpp_release": null
+  },
+  "server": {
+    "n_ctx_per_slot": 131072,
+    "total_slots": 4,
+    "model_path": "/opt/models/gemma-4-31B_q4_0-it.gguf",
+    "chat_template_sha": "6a1015c47ccf",
+    "build_info": "b869-82d6bb284"
+  },
+  "runtime": {
+    "host": "0.0.0.0",
+    "port": 8089,
+    "n_gpu_layers": 999,
+    "flash_attn": "on",
+    "batch_size": 2048,
+    "ubatch_size": 2048,
+    "ctx_size": 131072,
+    "n_parallel": null,
+    "cache_type_k": null,
+    "cache_type_v": null,
+    "model_path": "/opt/models/gemma-4-31B_q4_0-it.gguf",
+    "hf_ref": null,
+    "kind": "chat"
+  },
+  "quality": {
+    "temperature": 0.0,
+    "seed": 42,
+    "max_tokens": 4096,
+    "reasoning_effort": null
+  },
+  "task_config": {
+    "scoring_version": "2026-09-13.1",
+    "no_document": false,
+    "max_input_tokens": 0,
+    "chunk_tokens": 8000,
+    "top_k": 6,
+    "tolerance": 0.005,
+    "tags": [
+      {
+        "tag": "Revenues",
+        "label": "total revenues, i.e. the income statement's total revenues line (net sales if that is the top line)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "RegulatedAndUnregulatedOperatingRevenue",
+          "RevenueFromContractWithCustomerExcludingAssessedTax",
+          "RevenueFromContractWithCustomerIncludingAssessedTax",
+          "SalesRevenueNet"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "NetIncomeLoss",
+        "label": "net income (loss) attributable to the company",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [
+          "ProfitLoss",
+          "NetIncomeLossAvailableToCommonStockholdersBasic"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "OperatingIncomeLoss",
+        "label": "operating income (loss)",
+        "kind": "duration",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "EarningsPerShareDiluted",
+        "label": "diluted earnings per share",
+        "kind": "duration",
+        "unit": "USD/shares",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "NetCashProvidedByUsedInOperatingActivities",
+        "label": "net cash provided by operating activities",
+        "kind": "ytd",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Assets",
+        "label": "total assets",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "Liabilities",
+        "label": "total liabilities",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "StockholdersEquity",
+        "label": "total stockholders' equity attributable to the company",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"
+        ],
+        "accept_aliases": false
+      },
+      {
+        "tag": "CashAndCashEquivalentsAtCarryingValue",
+        "label": "cash and cash equivalents",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [],
+        "accept_aliases": false
+      },
+      {
+        "tag": "LongTermDebtNoncurrent",
+        "label": "long-term debt, excluding the current portion",
+        "kind": "instant",
+        "unit": "USD",
+        "aliases": [
+          "LongTermDebtAndCapitalLeaseObligations"
+        ],
+        "accept_aliases": true
+      },
+      {
+        "tag": "CommonStockSharesOutstanding",
+        "label": "common shares outstanding",
+        "kind": "instant",
+        "unit": "shares",
+        "aliases": [
+          "EntityCommonStockSharesOutstanding"
+        ],
+        "accept_aliases": false
+      }
+    ],
+    "companies": [
+      "AAPL",
+      "MSFT",
+      "GS",
+      "XOM",
+      "PLTR",
+      "WMT",
+      "PG",
+      "CAT",
+      "NEE",
+      "HD",
+      "INTU",
+      "STWD"
+    ],
+    "forms": {
+      "10-K": 1,
+      "10-Q": 3
+    },
+    "judge": null,
+    "parallel": 1,
+    "limit": null,
+    "filters": {
+      "tickers": [],
+      "forms": [
+        "10-K"
+      ]
+    }
+  },
+  "config_hash": "88ae57b21e01",
+  "tools": {},
+  "summary": {
+    "n": 121,
+    "scored": 121,
+    "correct": 117,
+    "score": 0.9669421487603306,
+    "skipped": 0,
+    "errors": 0,
+    "off_by_scale": 0,
+    "truncated": 0,
+    "ttft_p50_s": 1.4069558909977786,
+    "ttft_p95_s": 180.5650707000168,
+    "total_p50_s": 30.546234944020398,
+    "total_p95_s": 268.80265222198796,
+    "prompt_tps_p50": 100.7075289417044,
+    "decode_tps_p50": 7.880444443730489,
+    "total_tokens": 10295657,
+    "cached_prompt_tokens": 8902194,
+    "reasoning_tokens": 32696,
+    "by_form": {
+      "10-K": {
+        "n": 121,
+        "correct": 117
+      }
+    },
+    "by_mode": {
+      "full": {
+        "n": 93,
+        "correct": 93
+      },
+      "chunked": {
+        "n": 8,
+        "correct": 4
+      },
+      "section": {
+        "n": 20,
+        "correct": 20
+      }
+    },
+    "fallback": 28
+  },
+  "n_results": 121,
+  "format": "runrecord/1",
+  "model_label": "gemma-4-31b-spark-cuda"
+}
