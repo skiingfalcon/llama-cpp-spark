@@ -9,6 +9,7 @@
 | gemma-4-31b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 0 | 1.41 | 31 | 101 | 7.88 | 10295657 | 8902194 | 32696 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.967 | 0.93–0.99 | 0 | 0 | 1.38 | 5.15 | - | 29 | 9976288 | - | - | 131072 | 2.37.0/vulkan:lmstudio-2.37.0 | halo/vulkan | LM Studio stats; prompt t/s not measurable |
 | qwen3.8-27b | extract-full | 121 | 0.959 | 0.92–0.99 | 0 | 1 | 8.6 | 36 | 280 | 9.76 | 10371887 | 8762395 | 43613 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
+| gemma-4-31b-nothink | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1 | 2.42 | 105 | 7.8 | 10262738 | 8901986 | 0 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
 | glm-4.7-flash | extract-full | 121 | 0.942 | 0.90–0.98 | 0 | 4 | 0.602 | 24 | 146 | 28 | 10900593 | 9713858 | 103079 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | nemotron-3-super | extract-full | 121 | 0.926 | 0.87–0.97 | 0 | 6 | 3.15 | 47 | 676 | 19 | 14103962 | 12318170 | 131326 | 1048576 | 82d6bb284d1f/121a-real | spark/cuda | - |
@@ -34,6 +35,7 @@
 | extract-full | gemma-4-31b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | gpt-oss-120b | 121 | 117 | 0.967 | 0.93–0.99 |
 | extract-full | qwen3.8-27b | 121 | 116 | 0.959 | 0.92–0.99 |
+| extract-full | gemma-4-31b-nothink | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | glm-4.7-flash | 121 | 114 | 0.942 | 0.90–0.98 |
 | extract-full | nemotron-3-super | 121 | 112 | 0.926 | 0.87–0.97 |
