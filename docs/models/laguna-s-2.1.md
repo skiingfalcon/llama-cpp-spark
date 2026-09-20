@@ -1,97 +1,105 @@
 # laguna-s-2.1
 
-**Status:** planned (registered 2026-09-19, both platforms, no run yet). **Poolside's agentic-coding
-MoE, 118B total / 8B active — the same active-parameter class as gpt-oss-120b, our best Spark
-result, and the first coding-specialist model in this project's roster. Question to answer: does an
-architecture built for SWE tasks read 10-Ks as well as gpt-oss-120b, and does it change the SWE-suite
-picture the way nothing tested so far could?**
+**Status:** measured (Spark, thinking-off row, 2026-09-20; `-thinking` twin not yet run).
+**Poolside's agentic-coding MoE, 118B total / ~8B active, the closest active-parameter peer to
+gpt-oss-120b and the first coding-specialist model in this roster. First run: 115/121 (95.0%) in
+29 minutes, the fastest wall clock of any local model after gpt-oss-120b, at 17 t/s decode. Four
+questions behind gpt-oss-120b; the misses are Goldman's BM25 chunks plus two wrong-line picks.**
 
 ## Identity
 
 | | |
 | --- | --- |
-| Family / vendor | Poolside, Laguna S 2.1 (open weights, released 2026-07-21; part of the Laguna family alongside XS.2 33B-A3B and M.1 225B-A23B, both released 2026-04-28) |
-| Architecture | Mixture-of-experts, 118B total / ~8B active parameters; GQA with interleaved full and sliding-window attention layers (exact layer/head counts, expert count and top-k routing not yet verified against `poolside/Laguna-S-2.1`'s model card and the technical report, arXiv:2605.27605 — confirm on first real run); reasoning via hidden thinking, **off by default** (opposite of every other model registered here so far), toggled via `enable_thinking` in the chat template |
-| Checkpoint served | `unsloth/Laguna-S-2.1-GGUF`, quant `UD-Q4_K_XL` (3 shards, ~40 GB) |
-| Native context | Vendor sources disagree: some docs state 262,144, Poolside's own announcement claims up to 1,048,576 via extension. Unresolved — see Open questions |
-| License | OpenMDW-1.1 (verify on the model card) |
+| Family / vendor | Poolside, Laguna S 2.1 (open weights, announced 2026-07-21; the family also has XS.2 at 33B-A3B and M.1 at 225B-A23B, released 2026-04-28) |
+| Architecture | Mixture-of-experts, 118B total / ~8B active per token; 48 layers in a 1:3 global-to-sliding-window ratio (12 global attention layers, 36 sliding-window layers, window 512); grouped-query attention with 8 KV heads; 256 routed experts (top-10) plus 1 shared expert; native 1,048,576 context; reasoning via hidden thinking, **off by default** (opposite of every other model registered here), toggled per request through the chat template's `enable_thinking` kwarg |
+| Checkpoint served | `unsloth/Laguna-S-2.1-GGUF`, quant `UD-Q4_K_XL` (3 shards, 73.4 GB) |
+| Native context | 1,048,576 |
+| License | OpenMDW-1.1 |
 | Registry entry | `models.toml` and `models.halo.toml` `[models."laguna-s-2.1"]` and `[models."laguna-s-2.1-thinking"]`, port 8093 |
 
 Not registered: Laguna XS.2 (33B-A3B, overlaps the class already covered by gpt-oss-20b /
-glm-4.7-flash / gemma-4-26b-a4b) and Laguna M.1 (225B-A23B, ~110GB+ at 4-bit with little Spark
-headroom and no Halo fit, and 23B active parameters would sit in the Nemotron / Qwen3.5-122B-A10B
-speed band).
+glm-4.7-flash / gemma-4-26b-a4b) and Laguna M.1 (225B-A23B; at 4 bits the weights alone would
+leave little Spark headroom and no Halo fit, and 23B active parameters would sit in the Nemotron /
+Qwen3.5-122B-A10B speed band).
 
-## Serving configuration (planned)
+## Serving configuration used
 
 | Knob | Spark | Halo |
 | --- | --- | --- |
-| llama.cpp | pinned `82d6bb284d1f`. Laguna architecture support (`ggml-org/llama.cpp` PR #25165) merged upstream 2026-07-22, before our pin was cut (2026-09-11) — expected to need no pin bump, the same way `gemma4` and `deepseek4` did not | prebuilt zip at `LLAMA_CPP_RELEASE` |
+| llama.cpp | pinned `82d6bb284d1f` (`b869`). Laguna architecture support (`ggml-org/llama.cpp` PR #25165) merged upstream 2026-07-22, before the pin was cut (2026-09-11); no pin bump was needed | prebuilt zip at `LLAMA_CPP_RELEASE` (not yet served) |
 | Backend | cuda | vulkan (or rocm) |
-| ctx_size / n_parallel | 131072 / default | 131072 / default |
+| ctx_size / n_parallel | 131072 / default (4 slots) | 131072 / default |
 | Batch / ubatch | 2048 / 2048 | 2048 / 512 |
-| Flash attention / KV type | on / f16 (read "KV self size" from the server log once served) | on / f16, `--no-mmap` |
+| Flash attention / KV type | on / f16 | on / f16, `--no-mmap` |
 | Extra flags | `--jinja`; `-thinking` entry adds `--chat-template-kwargs {"enable_thinking": true}` | same, plus `--no-mmap` |
-| Sampling (serving only) | model defaults (not yet verified) | same |
+| Sampling (serving only) | model defaults | same |
+| Chat template | served template sha `444819b8ad46` (recorded in `run.json`) | |
 
-Eval decoding stays temperature 0, seed 42, `max_tokens` 4096. Plan: `scripts/spark-new-models-smoke.sh`
-runs a 22-item gate (AAPL, XOM) for both twins — including `eval swe check`, since this is the first
-coding-specialist model on the roster — then, if the gate passes, `extract-full` at 131K with
-thinking off (the primary row, matching vendor default), then the `-thinking` twin.
+Eval decoding stays temperature 0, seed 42, `max_tokens` 4096.
 
 ## Results
 
 | Run | Task | Accuracy | 95% CI | Fits / fallback | Truncated | Decode | Cold prefill | Wall clock | Source |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |
+| Spark CUDA, 131K, thinking off (vendor default) | extract-full | 95.0% (115/121) | 0.91–0.98 | 93 full (92/93) / 28 fallback (NEE + STWD Item 8: 19/20; GS BM25 chunks: 4/8) | 0 | 17.2 t/s | 816 t/s; 97–157 s TTFT on 80K+ filings | 29 min | [`20260920T003059Z-extract-full`](../../state/evals/sec/laguna-s-2.1-spark-cuda/20260920T003059Z-extract-full/) |
 
-## Strengths (expected, unmeasured)
+Report: [`eval-report-2026-09-spark-cuda-gemma-laguna.md`](../eval-report-2026-09-spark-cuda-gemma-laguna.md).
 
-- 8B active parameters: the bandwidth rule predicts roughly gpt-oss-120b's ballpark (~25-30 t/s) on
-  GB10, since the active-parameter counts are close (8B vs 5.1B) — the closest architectural peer to
-  our best Spark result so far.
-- ~40 GB of weights: comfortably fits the Spark alongside a large KV cache, and fits the Halo's 96 GB
-  VGM cap — the first Laguna candidate (and only the second model after Gemma) to run on both
-  platforms rather than being Spark-only.
-- Purpose-built for agentic coding/SWE: the only model in this roster designed for that workload
-  rather than adapted to it, so it's the natural one to give the SWE suite a real test rather than
-  just a gate check.
-- Poolside publishes an official self-speculative drafter, `poolside/Laguna-S-2.1-DFlash`, and our
-  pin already carries generic `--spec-type draft-dflash` support — a plausible speed-up once the
-  parked Spark speed plan resumes, though not part of this registration.
+Misses (6): GS NetIncomeLoss (the model wrote a 608-token prose search instead of a number, with
+thinking off: "I need to find the net income..."), GS Assets / Liabilities / StockholdersEquity
+("unknown", BM25 chunks), XOM Revenues (323.9B, the sales line, against 332.2B total revenues and
+other income), NEE StockholdersEquity (66.5B, total equity including noncontrolling interests,
+against 54.6B).
 
-## Weaknesses (expected, unmeasured)
+## Strengths (measured)
 
-- Thinking off by default breaks the naming convention every other model here uses (base = thinking
-  on); read `laguna-s-2.1` as the primary row and `laguna-s-2.1-thinking` as the experimental twin,
-  not the other way around.
-- An HF discussion on `poolside/Laguna-S-2.1` ("Thinking Loops, and Chat Template possible fix!")
-  reports the model can loop in reasoning; if the `-thinking` twin shows this, it would explain any
-  truncations the way it has for gemma/nemotron's default-on reasoning.
-- Native context is unverified: if the real ceiling is 262,144 rather than 1M, the "read GS/STWD
-  whole" experiment other long-context models got doesn't apply here.
-- Architecture and quant are new to this harness; exact expert/layer counts, GQA ratio, and
-  whether `UD-Q4_K_XL`'s dynamic quant holds up on numeric extraction are all unmeasured.
+- 29 minutes for the suite, three minutes behind gpt-oss-120b and faster than every other local
+  model: DeepSeek-nothink 51, Gemma-nothink 61, Qwen 125. Completions are tiny (median 13 tokens,
+  no reasoning) and cold prefill is 816 t/s, second only to gpt-oss-120b's 1,354.
+- 17.2 t/s decode, where the bandwidth rule puts it: ~8B active at 5 bits per weight (73.4 GB /
+  118B) is about 5 GB per token against gpt-oss-120b's 2.7 GB, so 30 t/s × 2.7 / 5 ≈ 16.
+- Zero truncations; 92 of 93 on full-document questions; 19 of 20 on the Item 8 section path.
+- Prompt-cache reuse 86.8% (9,005,904 of 10,378,894), warm re-prefill gap a median 86 tokens; the
+  sliding-window layers did not force a checkpoint re-prefill on this pin.
+- 73.4 GB of weights: fits the Halo's 96 GB cap as gpt-oss-120b's 63 GB does, so it can run on both
+  platforms, unlike deepseek-v4-flash.
+
+## Weaknesses (measured)
+
+- Four questions behind gpt-oss-120b (115 vs 119); intervals 0.91–0.98 vs 0.96–1.00 touch, so this
+  is at the edge of noise on one seed, but every other local model at this speed class also lost.
+- The tokenizer is fatter than gpt-oss's, as Gemma's is: GS 274,903 tokens (+14%), NEE 138,457
+  (+12%). NEE fell out of full-document mode and GS's Item 8 no longer fit, so Goldman went to BM25
+  chunks and lost 4 of 8. Same shape as Gemma; gpt-oss kept GS on the section path (7/8).
+- Two misses are wrong-line picks, not extraction failures: XOM's sales line for total revenues,
+  and NEE's total equity including noncontrolling interests. Both are the kind of accounting
+  judgment a coding-tuned model would not have been trained toward.
+- With thinking off it once reasoned aloud in the answer field for 608 tokens and never produced
+  the number (GS net income). The reported thinking-loop issue may show up more with thinking on.
 
 ## When to use / when not to
 
-- Not yet. If `laguna-s-2.1` lands at or above gpt-oss-120b (98.3%) at a comparable decode speed, it
-  becomes a second on-prem default candidate and the first coding-specialist entry worth taking to
-  the SWE suite seriously. If it lands well below that, or the thinking twin loops, the case for
-  Laguna narrows to "SWE-only" rather than a dual-purpose model.
+- The fast second option when gpt-oss-120b is busy or a coding-tuned model is wanted on the same
+  box: same wall clock class, four questions behind on one seed. Not yet a replacement for
+  gpt-oss-120b on extraction.
+- The model to take to the SWE tier 1 suite first: it is the only one here built for that
+  workload. The smoke gate's `eval swe check` output was not committed, so treat SWE readiness
+  as unverified until that run lands.
 
 ## Open questions
 
-- Exact architecture: layer count, GQA head ratio, sliding-window pattern, expert count and
-  top-k routing — verify against the vendor's model card and arXiv:2605.27605.
-- Real native context ceiling (262K vs 1M) and "KV self size" at 131K.
-- Whether `--chat-template-kwargs {"enable_thinking": true}` is honoured by the served template, or
-  whether `--reasoning on` is needed instead.
-- Whether the reported thinking-loop issue shows up under our 4096-token completion budget.
-- SWE-suite results specifically, since this is the first model registered here for that reason.
-- DFlash drafter compatibility and acceptance rate on 10-K text and SWE tasks, once the parked Spark
-  speed plan resumes.
+- `laguna-s-2.1-thinking`: does thinking on fix the wrong-line picks or trigger the reported loops
+  under a 4,096-token budget? Not yet run.
+- SWE tier 1, thinking off then on: the reason this model was registered.
+- Native window: does 262K (or more) on the Spark put GS's Item 8 back in budget and recover the
+  four chunk misses, as it did for Qwen on the 5090?
+- `poolside/Laguna-S-2.1-DFlash` drafter with the pin's `--spec-type draft-dflash`: acceptance rate
+  on 10-K text and SWE tasks, once the parked Spark speed plan resumes.
+- Halo run at 73.4 GB inside the 96 GB cap.
 
 ## Changelog
 
+- 2026-09-20 — first Spark run recorded (thinking off, 115/121, 17 t/s, 29 min); checkpoint size
+  corrected to 73.4 GB (registered as ~40 GB); architecture filled from the vendor card.
 - 2026-09-19 — registered on both platforms with a thinking-on twin (`-thinking`, not `-nothink`,
   since vendor default is thinking off); card created.

@@ -28,7 +28,7 @@ MODELS="${MODELS:-gemma-4-26b-a4b gemma-4-31b deepseek-v4-flash laguna-s-2.1}"
 FULL="${FULL:-0}"
 PUSH="${PUSH:-0}"
 DRY_RUN="${DRY_RUN:-0}"
-MIN_FREE_GB="${MIN_FREE_GB:-175}"
+MIN_FREE_GB="${MIN_FREE_GB:-210}"
 MODELS_DIR="${LOCAL_LLM_MODELS_DIR:-/opt/models}"
 export LOCAL_LLM_HEALTH_TIMEOUT_S="${LOCAL_LLM_HEALTH_TIMEOUT_S:-1500}"   # a 97 GB load beats the 300 s default
 
@@ -117,7 +117,7 @@ if [[ "${DRY_RUN}" != "1" ]]; then
   if [[ " ${MODELS} " == *" deepseek-v4-flash "* || " ${MODELS} " == *" laguna-s-2.1 "* ]] \
      && [[ "${free_gb}" -lt "${MIN_FREE_GB}" ]]; then
     echo "error: ${free_gb} GB free under ${MODELS_DIR}; need ${MIN_FREE_GB} GB for the four downloads" \
-         "(17.65 + 14.44 + 96.8 + ~40 GB). Free space or run with MODELS='gemma-4-26b-a4b gemma-4-31b'." >&2
+         "(17.65 + 14.44 + 96.8 + 73.4 GB). Free space or run with MODELS='gemma-4-26b-a4b gemma-4-31b'." >&2
     exit 1
   fi
 fi

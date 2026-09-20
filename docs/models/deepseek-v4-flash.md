@@ -46,6 +46,12 @@ unscored.
 
 | Run | Task | Accuracy | 95% CI | Fits / fallback | Truncated | Decode | Cold prefill | Wall clock | Source |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |
+| Spark CUDA, 131K, thinking off (`-nothink`) | extract-full | 98.3% (119/121) | 0.96–1.00 | 104 full (102/104) / 17 section (17/17) | 0 | 16.0 t/s | 422 t/s; 190–306 s TTFT on 80K+ filings | 51 min | [`20260919T121223Z-extract-full`](../../state/evals/sec/deepseek-v4-flash-nothink-spark-cuda/20260919T121223Z-extract-full/) |
+
+Misses: PLTR Liabilities and PLTR CommonStockSharesOutstanding, both exactly 1,000x too small.
+Prompt-cache reuse 87.9% (9,302,499 of 10,577,083 prompt tokens), so the PR #29008 risk below did
+not materialise on this pin. Email: [`emails/2026-09-19-deepseek-v4-flash-nothink.md`](../emails/2026-09-19-deepseek-v4-flash-nothink.md).
+The thinking twin has not been run.
 
 ## Strengths (expected, unmeasured)
 
@@ -83,4 +89,5 @@ unscored.
 
 ## Changelog
 
+- 2026-09-20 — nothink Spark run recorded (119/121, 16 t/s, 51 min, cache reuse 88%).
 - 2026-09-19 — registered on the Spark only, with a thinking-off twin as the primary row; card created.

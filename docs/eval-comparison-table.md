@@ -18,7 +18,10 @@ overlapping 95% intervals as noise, not a ranked difference.
 | DGX Spark, DeepSeek-V4-Flash-nothink (MoE, 13B active, 2-bit) | 98.3% | 102/104 | 16 t/s | 190–306 s | 51 min | $0 marginal |
 | RTX 5090, Bonsai 2 27B (ternary), 262K ctx | 96.7% | 100/104 | 93 t/s | 37–64 s | 20 min | $0 marginal |
 | AMD Strix Halo, gpt-oss-120b, Vulkan | 96.7% | 103/104 | 29 t/s | 4–8 min | 77 min | $0 marginal |
+| DGX Spark, Gemma 4 31B (dense), thinking on | 96.7% | 104/104 | 7.9 t/s | 202–356 s | 130 min | $0 marginal |
 | DGX Spark, Qwen3.8-27B (dense) | 95.9% | 104/104 | 10 t/s | 70–200 s | 125 min | $0 marginal |
+| DGX Spark, Gemma 4 31B (dense), thinking off | 95.0% | 102/104 | 7.8 t/s | 209–364 s | 61 min | $0 marginal |
+| DGX Spark, Laguna S 2.1 (MoE, 8B active), thinking off | 95.0% | 102/104 | 17 t/s | 97–157 s | 29 min | $0 marginal |
 | RTX 5090, Qwen3.8-27B (dense), 131K ctx | 94.2% | 102/104 | 60 t/s | 38–54 s | 23 min | $0 marginal |
 | DGX Spark, Bonsai 2 27B (ternary), 131K ctx | 93.4% | 102/104 | 16 t/s | 120–200 s | 107 min | $0 marginal |
 | DGX Spark, Nemotron-3-Super, 131K budget | 93.4% | 99/104 | 20 t/s | 105–160 s | 148 min | $0 marginal |
@@ -39,6 +42,8 @@ same size as Qwen's to the token.
 | RTX 5090, Qwen3.8-27B (both ctx) | `docs/eval-report-2026-09-rtx5090-cuda-qwen.md` |
 | DGX Spark, Qwen3.8-27B (dense) | `docs/eval-report-2026-09-spark-cuda-qwen.md` |
 | DGX Spark, DeepSeek-V4-Flash-nothink | `docs/emails/2026-09-19-deepseek-v4-flash-nothink.md`, `state/evals/sec/deepseek-v4-flash-nothink-spark-cuda/20260919T121223Z-extract-full` |
+| DGX Spark, Gemma 4 31B (both twins) | `docs/eval-report-2026-09-spark-cuda-gemma-laguna.md`, `state/evals/sec/gemma-4-31b-spark-cuda/20260919T174420Z-extract-full`, `state/evals/sec/gemma-4-31b-nothink-spark-cuda/20260919T202304Z-extract-full` |
+| DGX Spark, Laguna S 2.1 | `docs/eval-report-2026-09-spark-cuda-gemma-laguna.md`, `state/evals/sec/laguna-s-2.1-spark-cuda/20260920T003059Z-extract-full` |
 | RTX 5090, Bonsai 2 27B (both ctx) | `docs/eval-report-2026-09-rtx5090-bonsai2.md` |
 | DGX Spark, Bonsai 2 27B (ternary), 131K ctx | `state/evals/sec/bonsai-2-27b-spark-cuda/20260918T204818Z-extract-full` (no dedicated report yet; run on PrismML's fork, tag `prism-b10685`, not the pinned upstream build) |
 | DGX Spark, Nemotron-3-Super (both windows) | `docs/eval-report-2026-09-spark-cuda-nemotron.md` |

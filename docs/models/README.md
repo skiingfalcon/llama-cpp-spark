@@ -22,10 +22,11 @@ in step.
 | [nemotron-3-super](nemotron-3-super.md) | Hybrid Mamba/MoE 120B / 12.7B active, Q4_K | Spark CUDA, capped 131K | 93.4% | 0.88–0.98 | 20 t/s | 148 min | Over-thinks at 4096 (6 truncations); thinking cap + unconstrained run pending |
 | [glm-4.7-flash](glm-4.7-flash.md) | MoE 30B / 3.6B active, UD-Q4_K_XL | Spark CUDA | 94.2% | 0.90–0.98 | 28 t/s | 102 min | Small/fast candidate; 4 truncations; thinking-off run pending |
 | [qwen3.5-122b-a10b](qwen3.5-122b-a10b.md) | MoE 122B / 10B active, UD-Q4_K_XL | Spark CUDA, 262K | 90.9% | 0.85–0.96 | 17 t/s | 250 min | Behind the dense 27B; 10 truncations; thinking-off run pending |
-| [gemma-4-31b](gemma-4-31b.md) | Dense 30.7B, Google QAT q4_0 | planned (Spark first) | — | — | — | — | Google's dense rival to qwen3.8-27b; thinking on vs off runs pending |
+| [gemma-4-31b](gemma-4-31b.md) | Dense 30.7B, Google QAT q4_0 | Spark CUDA, thinking on | 96.7% | 0.93–0.99 | 7.9 t/s | 130 min | Perfect on every filing that fits (104/104); loses only GS chunks; slowest dense model here |
+| ↳ same, thinking off (`-nothink`) | | Spark CUDA | 95.0% | 0.91–0.98 | 7.8 t/s | 61 min | Thinking bought 2 questions for 69 min; 0 truncations either way |
 | [gemma-4-26b-a4b](gemma-4-26b-a4b.md) | MoE 25.2B / 3.8B active, Google QAT q4_0 | planned (Spark first) | — | — | — | — | Fast-decode candidate against gpt-oss-20b / GLM; runs pending |
-| [deepseek-v4-flash](deepseek-v4-flash.md) | MoE ~13B active, UD-Q2_K_XL 96.8 GB, 1M ctx | planned (Spark only; nothink row primary) | — | — | — | — | Only DeepSeek V4 that fits 128 GB; 2-bit quality and prompt-cache gate pending |
-| [laguna-s-2.1](laguna-s-2.1.md) | MoE 118B / 8B active, UD-Q4_K_XL 40 GB | planned (Spark + Halo) | — | — | — | — | First coding-specialist model on the roster; apples-to-apples MoE peer to gpt-oss-120b; thinking-on twin (`-thinking`) since vendor default is off |
+| [deepseek-v4-flash](deepseek-v4-flash.md) | MoE ~13B active, UD-Q2_K_XL 96.8 GB, 1M ctx | Spark CUDA, thinking off (`-nothink`) | 98.3% | 0.96–1.00 | 16 t/s | 51 min | Ties 120b on accuracy at 2 bits; half the decode; 88% cache reuse, so the pin risk is closed; thinking twin pending |
+| [laguna-s-2.1](laguna-s-2.1.md) | MoE 118B / 8B active, UD-Q4_K_XL 73.4 GB | Spark CUDA, thinking off (vendor default) | 95.0% | 0.91–0.98 | 17 t/s | 29 min | First coding-specialist here; fastest wall clock after 120b; misses are GS chunks + two wrong-line picks; `-thinking` twin and SWE suite pending |
 | [gpt-5.6-terra](gpt-5.6-terra.md) | Hosted frontier | OpenAI API | 99.2% | 0.98–1.00 | — | 20 min, ~$25 | Ceiling reference |
 
 Intervals are percentile bootstraps over per-item verdicts from a single run; overlapping

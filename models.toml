@@ -266,22 +266,21 @@ port = 8092
 extra_args = ["--jinja", "--reasoning", "off"]
 
 [models."laguna-s-2.1"]
-# Poolside Laguna S 2.1 (OpenMDW-1.1): MoE, 118B total / 8B active, GQA with interleaved full and
-# sliding-window attention layers (verify exact layer/head counts against poolside/Laguna-S-2.1's
-# HF page and arXiv:2605.27605 on first real run). Same active-parameter class as gpt-oss-120b
+# Poolside Laguna S 2.1 (OpenMDW-1.1): MoE, 118B total / ~8B active; 48 layers in a 1:3
+# global-to-sliding-window ratio (12 global, 36 SWA, window 512), 8 KV heads, 256 routed experts
+# (top-10) + 1 shared; native 1,048,576 ctx. Same active-parameter class as gpt-oss-120b
 # (117B/5.1B active), so this is the first apples-to-apples MoE comparison against our best Spark
 # result, not just another leaderboard entry. Also the first coding-specialist model registered on
 # the Spark: Poolside built the Laguna family for agentic coding/SWE, which this project's SWE
 # benchmarks (see `eval swe check` in the smoke script) have had nothing purpose-built to test
 # against so far.
-# Checkpoint: unsloth/Laguna-S-2.1-GGUF, quant UD-Q4_K_XL, ~40 GB across 3 shards (the downloader
-# handles multi-shard GGUFs, as for deepseek-v4-flash and qwen3.5-122b-a10b). Small enough to serve
-# on the Spark and Halo (96 GB VGM cap) both; too big for the RTX 5090's 32 GB.
+# Checkpoint: unsloth/Laguna-S-2.1-GGUF, quant UD-Q4_K_XL, 73.4 GB across 3 shards (the downloader
+# handles multi-shard GGUFs, as for deepseek-v4-flash and qwen3.5-122b-a10b). Fits the Spark and,
+# like gpt-oss-120b's 63 GB, the Halo's 96 GB VGM cap; too big for the RTX 5090's 32 GB.
 # llama.cpp arch support (Laguna XS.2/M.1) merged upstream 2026-07-22 (PR #25165), before our pin
 # (82d6bb284d1f, cut 2026-09-11) — same story as gemma4 and deepseek4, no pin bump expected.
 # Vendor default is thinking OFF (opposite of every other model registered so far), so this base
 # entry, not a "-nothink" twin, is the PRIMARY row. See "laguna-s-2.1-thinking" for the twin.
-# Context: vendor docs disagree (262,144 documented in some places, up to 1M claimed elsewhere).
 # Register at the shared 131072 budget like every other model; read "KV self size" from
 # state/laguna-s-2.1.log before trying a larger window.
 # Known risk: an upstream HF discussion on poolside/Laguna-S-2.1 reports repeated thinking loops;

@@ -212,8 +212,9 @@ sampling = { temp = 1.0, top_p = 0.95, top_k = 64 }
 # reserved so the names stay aligned if a Linux-on-Halo path ever serves it.
 
 [models."laguna-s-2.1"]
-# Poolside Laguna S 2.1, UD-Q4_K_XL (~40 GB): unlike deepseek-v4-flash, this fits the Halo's 96 GB
-# VGM cap, so it is registered on both platforms. See models.toml for the full identity comment.
+# Poolside Laguna S 2.1, UD-Q4_K_XL (73.4 GB): unlike deepseek-v4-flash, this fits the Halo's 96 GB
+# VGM cap (gpt-oss-120b is 63 GB), so it is registered on both platforms. See models.toml for the
+# full identity comment.
 repo = "unsloth/Laguna-S-2.1-GGUF"
 quant = "UD-Q4_K_XL"
 kind = "chat"

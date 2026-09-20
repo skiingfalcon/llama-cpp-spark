@@ -1,9 +1,10 @@
 # gemma-4-31b
 
-**Status:** planned (registered 2026-09-19, no run yet). **Google's dense mid-size model: the
-like-for-like rival to qwen3.8-27b, with a 256K window and a 262K-token vocabulary that should let
-more filings fit the 131K budget whole. Question to answer: does it read 10-Ks as well as Qwen, and
-what does thinking on vs off cost it?**
+**Status:** measured (Spark, both twins, 2026-09-19). **Google's dense mid-size model, the
+like-for-like rival to qwen3.8-27b. Thinking on: 117/121 (96.7%), perfect on every filing that fits
+the window, losing only Goldman's BM25 chunks. Thinking off: 115/121 (95.0%) in half the wall
+clock. Slowest dense model on the Spark at 7.9 t/s, and the 262K vocabulary made filings cost
+more tokens, not fewer.**
 
 ## Identity
 
@@ -18,7 +19,7 @@ what does thinking on vs off cost it?**
 
 Vendor claims (not ours): frontier-level performance at each size; MRCR v2 8-needle 128K 66.4%.
 
-## Serving configuration (planned)
+## Serving configuration used
 
 | Knob | Spark | Halo / RTX 5090 |
 | --- | --- | --- |
@@ -40,42 +41,56 @@ Goldman for Qwen.
 
 | Run | Task | Accuracy | 95% CI | Fits / fallback | Truncated | Decode | Cold prefill | Wall clock | Source |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |
+| Spark CUDA, 131K, thinking on | extract-full | 96.7% (117/121) | 0.93–0.99 | 93 full / 28 fallback (NEE + STWD Item 8: 31/31; GS BM25 chunks: 4/8) | 0 | 7.9 t/s | 367 t/s; 202–356 s TTFT on 80K+ filings | 130 min | [`20260919T174420Z-extract-full`](../../state/evals/sec/gemma-4-31b-spark-cuda/20260919T174420Z-extract-full/) |
+| Spark CUDA, 131K, thinking off (`-nothink`) | extract-full | 95.0% (115/121) | 0.91–0.98 | 93 full / 28 fallback (Item 8: 31/31; GS chunks: 4/8) | 0 | 7.8 t/s | 355 t/s; 209–364 s | 61 min | [`20260919T202304Z-extract-full`](../../state/evals/sec/gemma-4-31b-nothink-spark-cuda/20260919T202304Z-extract-full/) |
 
-## Strengths (expected, unmeasured)
+Both runs on the pin `82d6bb284d1f`, `n_ctx_per_slot` 131,072, temperature 0, seed 42,
+`max_tokens` 4096. Report: [`eval-report-2026-09-spark-cuda-gemma-laguna.md`](../eval-report-2026-09-spark-cuda-gemma-laguna.md).
 
-- Dense 30.7B at 4-bit QAT: Google reports near-bf16 quality for the QAT checkpoints, which is the
-  class in which Qwen3.8-27B read every document it saw correctly.
-- 262,144-token vocabulary: filings should cost fewer tokens than under Qwen's or gpt-oss's
-  tokenizer, so the 131K budget covers more filings whole and the fallback boundary moves.
-- 17.65 GB of weights: serves next to gpt-oss-120b on the Spark, fits the RTX 5090 with the 131K
-  KV cache.
-- Multi-token-prediction drafters exist (`gemma4-assistant`; unsloth ships `mtp-gemma-4-31B-it.gguf`,
-  0.28 GB, `--spec-type draft-mtp --spec-draft-n-max 4`) with identical output: the cheapest
-  speed-up on the list once the parked speed plan resumes.
+## Strengths (measured)
 
-## Weaknesses (expected, unmeasured)
+- 104 of 104 on the ten filings that fit the window with thinking on, the first local model to do
+  that alongside the Spark Qwen run; 102 of 104 with thinking off (MSFT shares came back "unknown",
+  PLTR net income landed 0.6% high, just outside tolerance).
+- Perfect on the Item 8 section fallback: 31 of 31 across NEE and STWD in both runs.
+- Zero truncations in either run. Thinking is short and disciplined: 32.7K reasoning tokens over the
+  suite, median 202 per question, against Nemotron's 131K and Qwen3.5-122B's 219K.
+- Prompt-cache reuse is normal: 86.5% of prompt tokens served from cache, warm re-prefill gap a
+  median 86 tokens. The predicted one-ubatch (~2,028-token) SWA re-prefill did not happen on this pin.
+- 17.65 GB of weights; serves beside gpt-oss-120b on the Spark and fits the RTX 5090.
 
-- Dense: the bandwidth rule predicts ~10 t/s on GB10, as for qwen3.8-27b (125 min per suite).
-- Sliding-window attention takes llama-server's context-checkpoint path, so each warm question
-  likely re-prefills about one micro-batch (qwen3.8-27b: ~2,028 tokens, ~8 s) instead of a few
-  hundred tokens.
-- Thinking on by default; the 4096-token budget has cost every thinking model here at least one
-  answer.
-- Vision tower shipped but unused; not measured on this workload.
+## Weaknesses (measured)
+
+- 7.9 t/s decode, below the ~10 t/s the bandwidth rule predicted and below qwen3.8-27b's 9.8; the
+  slowest dense model on the Spark. Cold prefill 355–367 t/s is a quarter of gpt-oss-120b's 1,354.
+- The 262,144-token vocabulary did not shrink the filings. GS is 271,429 tokens here against 242,026
+  under gpt-oss (+12%), NEE 136,728 against 124,130 (+10%). NEE therefore left full-document mode,
+  and GS's Item 8 no longer fit the budget, so Goldman dropped to BM25 chunks: 4 of 8 in both runs,
+  three "unknown" and one equity figure 1% off.
+- Thinking on cost 69 minutes (130 vs 61) for two more correct answers; the difference is the
+  32.7K reasoning tokens at 7.9 t/s almost exactly. One seed; the intervals overlap.
+- Vision tower shipped but unused; the MTP drafter is untested.
 
 ## When to use / when not to
 
-- Not yet. Decide after runs (1) and (2): if it lands with Qwen (116/121) or better at 131K it is
-  the second dense candidate and the model to take to 262K; if it lands below glm-4.7-flash
-  (114/121) at three times the decode cost, the dense slot stays with Qwen.
+- The second dense candidate after qwen3.8-27b, and the more accurate of the two on filings that
+  fit (104/104 vs Qwen's 104/104 at 131K on the Spark; both read every fitting filing right).
+  Not a speed option: 130 minutes per suite with thinking, 61 without, against 26 for gpt-oss-120b.
+- Reach for it when a document fits 131K and accuracy on that document matters more than latency;
+  do not reach for it on Goldman-sized filings at 131K, where the fatter tokenizer forces chunks.
 
 ## Open questions
 
-- Warm `prompt_tokens - cached_prompt_tokens` gap on the Spark versus Qwen3.8's ~2,028.
-- "KV self size" at 131K with shared global K/V; whether 262K fits beside gpt-oss-120b.
-- Token counts for GS, STWD and NEE under the 262K vocabulary: which filings now fit whole.
-- Thinking on vs off on extraction and on tier 1; the MTP drafter's acceptance on 10-K text.
+- Native 262K window on the Spark, the run that recovered Goldman for Qwen: does GS's Item 8 fit
+  and do the four chunk misses close?
+- Thinking on vs off on the SWE tier 1 suite; whether the two-question thinking gain repeats on a
+  second seed.
+- The MTP drafter's acceptance rate on 10-K text (`mtp-gemma-4-31B-it.gguf`, 0.28 GB), once the
+  parked speed plan resumes.
+- "KV self size" at 131K was not captured in the run record; read it from the server log.
 
 ## Changelog
 
+- 2026-09-20 — both Spark runs recorded (thinking on 117/121, off 115/121); strengths and
+  weaknesses rewritten from measurements; status measured.
 - 2026-09-19 — registered on both platforms with a thinking-off twin; card created.
