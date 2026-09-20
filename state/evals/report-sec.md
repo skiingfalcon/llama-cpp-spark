@@ -11,6 +11,7 @@
 | qwen3.8-27b | extract-full | 121 | 0.959 | 0.92–0.99 | 0 | 1 | 8.6 | 36 | 280 | 9.76 | 10371887 | 8762395 | 43613 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gemma-4-31b-nothink | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1 | 2.42 | 105 | 7.8 | 10262738 | 8901986 | 0 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | gpt-oss-120b | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 1.19 | 7.43 | - | 19 | 9976288 | - | - | 131072 | 2.37.0/rocm:lmstudio-2.37.0 | halo/rocm | LM Studio stats; prompt t/s not measurable |
+| laguna-s-2.1 | extract-full | 121 | 0.95 | 0.91–0.98 | 0 | 0 | 0.727 | 1.38 | 153 | 17 | 10378894 | 9005904 | 0 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | glm-4.7-flash | extract-full | 121 | 0.942 | 0.90–0.98 | 0 | 4 | 0.602 | 24 | 146 | 28 | 10900593 | 9713858 | 103079 | 131072 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | nemotron-3-super | extract-full | 121 | 0.926 | 0.87–0.97 | 0 | 6 | 3.15 | 47 | 676 | 19 | 14103962 | 12318170 | 131326 | 1048576 | 82d6bb284d1f/121a-real | spark/cuda | - |
 | qwen3.5-122b-a10b | extract-full | 121 | 0.909 | 0.85–0.96 | 0 | 10 | 3.87 | 101 | 578 | 17 | 12949305 | 11228093 | 219423 | 262144 | 82d6bb284d1f/121a-real | spark/cuda | - |
@@ -18,7 +19,7 @@
 | bonsai-2-27b | qa-financebench | 150 | 0.108 | 0.04–0.19 | 0 | 5 | 0.319 | 3.11 | 2,962 | 141 | 247610 | 8798 | 113312 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 | qwen3.8-27b | qa-financebench | 150 | 0.0946 | 0.04–0.16 | 0 | 2 | 0.347 | 4.69 | 2,569 | 76 | 216047 | 8715 | 81450 | 131072 | 82d6bb284d1f/? | halo/vulkan | - |
 
-> warning: task extract-full: runs use different configs (455128a4cdd6, 58b2946660ca, 607363d040e8, 79b275f02365, 814702bdea13, 88ae57b21e01, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, d7b23810e084, ea71250ebf92)
+> warning: task extract-full: runs use different configs (2384d2e3c8bf, 455128a4cdd6, 58b2946660ca, 607363d040e8, 79b275f02365, 814702bdea13, 88ae57b21e01, 9466ddd63b34, 99d094a0fde9, 9cc51d84df5a, afc7e6a05fdb, cb268609a9e5, d7b23810e084, ea71250ebf92)
 
 > warning: task qa-financebench: runs use different configs (763cb232e7b3, 87d95c71472e)
 
@@ -37,6 +38,7 @@
 | extract-full | qwen3.8-27b | 121 | 116 | 0.959 | 0.92–0.99 |
 | extract-full | gemma-4-31b-nothink | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | gpt-oss-120b | 121 | 115 | 0.95 | 0.91–0.98 |
+| extract-full | laguna-s-2.1 | 121 | 115 | 0.95 | 0.91–0.98 |
 | extract-full | glm-4.7-flash | 121 | 114 | 0.942 | 0.90–0.98 |
 | extract-full | nemotron-3-super | 121 | 112 | 0.926 | 0.87–0.97 |
 | extract-full | qwen3.5-122b-a10b | 121 | 110 | 0.909 | 0.85–0.96 |
